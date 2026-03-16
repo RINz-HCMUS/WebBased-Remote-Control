@@ -1,0 +1,301 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <span id="connection-status" class="badge bg-secondary p-2">Connecting...</span>
+    </div>
+</div>
+
+<!-- Welcome Alert -->
+<div class="alert alert-info" id="welcome-alert">
+    Please select a PC from the sidebar to manage, or broadcast commands to all connected PCs.
+</div>
+
+<!-- Main Control Panel (hidden initially) -->
+<div id="control-panel" class="d-none">
+    <h3 id="selected-pc-name" class="mb-4">Selected PC: None</h3>
+
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="process-tab" data-bs-toggle="tab" data-bs-target="#processes" type="button" role="tab">Processes & Apps</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="media-tab" data-bs-toggle="tab" data-bs-target="#media" type="button" role="tab">Screen & Webcam</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="keylog-tab" data-bs-toggle="tab" data-bs-target="#keylog" type="button" role="tab">Keylogger & Files</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link text-danger" id="power-tab" data-bs-toggle="tab" data-bs-target="#power" type="button" role="tab">Power Controls</button>
+        </li>
+    </ul>
+
+    <div class="tab-content pt-4" id="myTabContent">
+        <!-- Processes Tab -->
+        <div class="tab-pane fade show active" id="processes" role="tabpanel">
+            <div class="row">
+                <div class="col-md-6 border-end">
+                    <h5 class="mb-3">Background Processes</h5>
+                    <button class="btn btn-primary mb-3" onclick="getProcesses()">Refresh Processes</button>
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr><th>ID</th><th>Name</th><th>Threads</th><th>Action</th></tr>
+                            </thead>
+                            <tbody id="process-table-body">
+                                <tr><td colspan="4" class="text-center">Click Refresh to load</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h5 class="mb-3">Visible Applications</h5>
+                    <div class="input-group mb-3">
+                        <button class="btn btn-info" onclick="getApplications()">Refresh Apps</button>
+                        <input type="text" id="start-app-path" class="form-control" placeholder="Path to open (e.g. notepad.exe)">
+                        <button class="btn btn-success" onclick="startApplication()">Start App</button>
+                    </div>
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-striped table-hover">
+                            <thead class="table-primary">
+                                <tr><th>ID</th><th>Title</th><th>Action</th></tr>
+                            </thead>
+                            <tbody id="app-table-body">
+                                <tr><td colspan="3" class="text-center">Click Refresh Apps to load</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Media Tab -->
+        <div class="tab-pane fade" id="media" role="tabpanel">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-dark text-white d-flex justify-content-between">
+                            <span>Screen Capture</span>
+                            <button class="btn btn-sm btn-light" onclick="takeScreenshot()">Capture</button>
+                        </div>
+                        <div class="card-body text-center bg-light">
+                            <img id="screenshot-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="img-fluid" alt="Screenshot" />
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-dark text-white d-flex justify-content-between">
+                            <span>Webcam Stream</span>
+                            <div>
+                                <button class="btn btn-sm btn-success" onclick="startWebcam()">Start</button>
+                                <button class="btn btn-sm btn-danger" onclick="stopWebcam()">Stop</button>
+                            </div>
+                        </div>
+                        <div class="card-body text-center bg-light">
+                            <img id="webcam-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="img-fluid" alt="Webcam" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Keylogger & Files Tab -->
+        <div class="tab-pane fade" id="keylog" role="tabpanel">
+            <div class="row">
+                <!-- Keylogger -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-dark text-white d-flex justify-content-between">
+                            <span>Live Keylogger</span>
+                            <div>
+                                <button class="btn btn-sm btn-success" onclick="startKeylogger()">Start</button>
+                                <button class="btn btn-sm btn-danger" onclick="stopKeylogger()">Stop</button>
+                            </div>
+                        </div>
+                        <div class="card-body bg-dark">
+                            <pre id="keylog-console" class="text-success mb-0" style="height: 300px; overflow-y: auto; font-family: 'Courier New', monospace;">> Awaiting key strokes...</pre>
+                        </div>
+                    </div>
+                </div>
+                <!-- Files -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-dark text-white">File Transfer</div>
+                        <div class="card-body">
+                            <div class="input-group mb-3">
+                                <input type="text" id="file-path-input" class="form-control" placeholder="C:\Users\Public\file.txt">
+                                <button class="btn btn-outline-secondary" type="button" onclick="downloadFile()">Download</button>
+                            </div>
+                            <div id="file-download-status" class="text-muted small"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Power Tab -->
+        <div class="tab-pane fade" id="power" role="tabpanel">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">System Power & Commands</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Execute command on selected PC:</strong></p>
+                            <button class="btn btn-warning w-100 mb-2" onclick="powerCommand('Restart')">Restart System</button>
+                            <button class="btn btn-danger w-100" onclick="powerCommand('Shutdown')">Shutdown System</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/remoteHub")
+            .build();
+
+        let currentTargetId = null;
+        let connectedAgents = [];
+
+        // START Connection
+        connection.start().then(function () {
+            document.getElementById("connection-status").textContent = "Connected";
+            document.getElementById("connection-status").className = "badge bg-success p-2";
+        }).catch(function (err) {
+            document.getElementById("connection-status").textContent = "Connection Failed";
+            document.getElementById("connection-status").className = "badge bg-danger p-2";
+            return console.error(err.toString());
+        });
+
+        // Hub Listeners
+        connection.on("AgentConnected", function (connectionId, machineName) {
+            console.log("Agent Connected: " + machineName);
+            connectedAgents.push({ id: connectionId, name: machineName });
+            renderAgentList();
+        });
+
+        connection.on("AgentDisconnected", function (connectionId, machineName) {
+            console.log("Agent Disconnected: " + machineName);
+            connectedAgents = connectedAgents.filter(a => a.id !== connectionId);
+            if (currentTargetId === connectionId) {
+                currentTargetId = null;
+                document.getElementById('control-panel').classList.add('d-none');
+                document.getElementById('welcome-alert').classList.remove('d-none');
+            }
+            renderAgentList();
+        });
+
+        // UI Helpers
+        function renderAgentList() {
+            const list = document.getElementById("pc-list");
+            list.innerHTML = "";
+            connectedAgents.forEach(agent => {
+                const li = document.createElement("li");
+                li.className = "nav-item";
+                li.innerHTML = `<a class="nav-link ${agent.id === currentTargetId ? 'active' : ''}" href="#" onclick="selectAgent('${agent.id}', '${agent.name}')">
+                    🖥️ ${agent.name} <span class="badge bg-success float-end">Online</span>
+                </a>`;
+                list.appendChild(li);
+            });
+        }
+
+        function selectAgent(id, name) {
+            currentTargetId = id;
+            document.getElementById('selected-pc-name').textContent = "Selected PC: " + name;
+            document.getElementById('welcome-alert').classList.add('d-none');
+            document.getElementById('control-panel').classList.remove('d-none');
+            renderAgentList(); // To update active class
+        }
+
+        // --- COMMANDS ---
+        function getProcesses() { 
+            if(!currentTargetId) return; 
+            document.getElementById("process-table-body").innerHTML = '<tr><td colspan="4" class="text-center"><span class="spinner-border spinner-border-sm"></span> Loading...</td></tr>';
+            connection.invoke("RequestProcesses", currentTargetId).catch(err => console.error(err));
+        }
+        
+        connection.on("ReceiveProcesses", function(targetId, jsonArray) {
+            const processes = JSON.parse(jsonArray);
+            const tbody = document.getElementById("process-table-body");
+            tbody.innerHTML = "";
+            processes.forEach(p => {
+                tbody.innerHTML += `<tr>
+                    <td>${p.Id}</td>
+                    <td>${p.Name}</td>
+                    <td>${p.Threads}</td>
+                    <td><button class="btn btn-sm btn-danger" onclick="killProcess(${p.Id})">Kill</button></td>
+                </tr>`;
+            });
+        });
+
+        function getApplications() { 
+            if(!currentTargetId) return; 
+            document.getElementById("app-table-body").innerHTML = '<tr><td colspan="3" class="text-center"><span class="spinner-border spinner-border-sm"></span> Loading...</td></tr>';
+            connection.invoke("RequestApplications", currentTargetId).catch(err => console.error(err));
+        }
+
+        connection.on("ReceiveApplications", function(targetId, jsonArray) {
+            const apps = JSON.parse(jsonArray);
+            const tbody = document.getElementById("app-table-body");
+            tbody.innerHTML = "";
+            apps.forEach(a => {
+                tbody.innerHTML += `<tr>
+                    <td>${a.Id}</td>
+                    <td><small><strong>${a.Name}</strong><br/>${a.Title}</small></td>
+                    <td><button class="btn btn-sm btn-danger" onclick="killProcess(${a.Id})">Close</button></td>
+                </tr>`;
+            });
+        });
+
+        function killProcess(pid) {
+            if(!currentTargetId) return;
+            if(confirm('Are you sure you want to kill process/app ' + pid + '?')) {
+                connection.invoke("KillProcess", currentTargetId, pid).catch(err => console.error(err));
+                setTimeout(() => { getProcesses(); getApplications(); }, 1000); // refresh after 1s
+            }
+        }
+
+        function startApplication() {
+            if(!currentTargetId) return;
+            let path = document.getElementById("start-app-path").value;
+            if(!path) { alert("Please enter application path or name!"); return; }
+            connection.invoke("StartApplication", currentTargetId, path).catch(err => console.error(err));
+            setTimeout(getApplications, 1500); // refresh after 1.5s
+        }
+
+        function takeScreenshot() { 
+            if(!currentTargetId) return; 
+            document.getElementById("screenshot-img").src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23EEEEEE'/%3E%3Ctext x='50%25' y='50%25' fill='%23555555' font-family='Arial' font-size='10' text-anchor='middle'%3ELoading...%3C/text%3E%3C/svg%3E";
+            connection.invoke("RequestScreenshot", currentTargetId).catch(err => console.error(err));
+        }
+
+        connection.on("ReceiveScreenshot", function(targetId, base64Image) {
+            if(base64Image) {
+                document.getElementById("screenshot-img").src = "data:image/jpeg;base64," + base64Image;
+            }
+        });
+
+        function startWebcam() { if(!currentTargetId) return; alert("Feature coming soon."); }
+        function stopWebcam() { if(!currentTargetId) return; alert("Feature coming soon."); }
+        function startKeylogger() { if(!currentTargetId) return; alert("Feature coming soon."); }
+        function stopKeylogger() { if(!currentTargetId) return; alert("Feature coming soon."); }
+        function downloadFile() { if(!currentTargetId) return; alert("Feature coming soon."); }
+        
+        function powerCommand(cmd) { 
+            if(!currentTargetId) return; 
+            if(confirm('CRITICAL WARNING: Are you sure you want to ' + cmd + ' the target machine? It will be disconnected.')) {
+                if (cmd === 'Shutdown') connection.invoke("ShutdownDevice", currentTargetId).catch(err => console.error(err));
+                else if (cmd === 'Restart') connection.invoke("RestartDevice", currentTargetId).catch(err => console.error(err));
+            }
+        }
+    </script>
+}

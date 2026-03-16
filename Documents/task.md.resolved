@@ -1,0 +1,36 @@
+# Task Breakdown: Topic 04 - Remote Control Web App
+
+## 1. Planning & Design
+- [x] clarify architecture (Client as Web App vs current WinForms client)
+- [x] define API communication protocol (HTTP/WebSockets/SignalR) between Client and Server
+- [x] write System Design Report (Architecture, Data, UI, Functions)
+- [x] design Multi-PC support using Hub-Spoke topology
+
+## 2. Server Implementation (C# ASP.NET Core & SignalR Hub)
+- [ ] create new ASP.NET Core MVC project
+- [ ] configure SignalR Hub for Admin and Agent connections
+- [ ] implement connection management (handling multiple PCs)
+- [ ] implement routing messages from Admin to Agent and back
+
+## 3. Agent Implementation (C# Console/Service for Managed PC)
+- [ ] create new C# Console App for the background Agent
+- [ ] connect Agent to SignalR Hub via SignalR.Client
+- [ ] implement App/Process manager (List/Start/Stop)
+- [ ] implement Screenshot capture (System.Drawing)
+- [ ] implement Keylogger (WH_KEYBOARD_LL Windows Hook)
+- [ ] implement File explorer and Download functionality
+- [ ] implement Webcam stream (AForge.Video)
+- [ ] implement System power controls (Shutdown/Reset)
+
+## 4. Web Client Implementation (Browser Dashboard UI)
+- [ ] build dashboard UI layout (Sidebar with PC list)
+- [ ] integrate SignalR JS client to connect to Hub
+- [ ] build UI/UX for Process & App management
+- [ ] build UI/UX for live Screen & Webcam streaming
+- [ ] build UI/UX for Terminal/Keylogger
+- [ ] build UI for File Downloads
+
+## 5. Testing & Finalization
+- [ ] run end-to-end tests for all features with multiple Agents
+- [ ] record demo video (Host Admin vs VMs)
+- [ ] final codebase cleanup
