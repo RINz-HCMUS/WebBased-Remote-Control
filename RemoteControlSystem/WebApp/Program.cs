@@ -7,7 +7,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    // Increase max message size to handle large base64 image strings (10 MB)
+    options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
+});
 
 var app = builder.Build();
 

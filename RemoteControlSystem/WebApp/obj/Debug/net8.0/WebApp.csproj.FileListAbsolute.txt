@@ -23,3 +23,4 @@ C:\Users\rinzd\CDTN\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debu
 C:\Users\rinzd\CDTN\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.pdb
 C:\Users\rinzd\CDTN\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.genruntimeconfig.cache
 C:\Users\rinzd\CDTN\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\ref\WebApp.dll
+C:\Users\rinzd\CDTN\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.sourcelink.json

