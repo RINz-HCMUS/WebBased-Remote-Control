@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 using WebApp.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.WebHost.UseUrls("http://192.168.0.103:5000"); // Lắng nghe trên mọi IP trong mạng LAN
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddSignalR(options =>

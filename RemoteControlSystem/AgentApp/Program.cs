@@ -251,7 +251,7 @@ namespace AgentApp
                                         else if (key == ConsoleKey.Enter) keyName = "Enter";
                                         else if (key == ConsoleKey.Spacebar) keyName = "Space";
                                         else if (key == ConsoleKey.Tab) keyName = "Tab";
-
+                                        
                                         if (isShift) prefix += "Shift+";
                                         keyOutput = $"[{prefix}{keyName}]";
                                     }
@@ -364,14 +364,27 @@ namespace AgentApp
                         if (_videoSource == null)
                         {
                             var device = videoDevices[0];
+                            // Ưu tiên chọn WebCam thường (RGB), bỏ qua IR Camera (thường gặp trên Asus Expertbook có Windows Hello)
+                            foreach (FilterInfo d in videoDevices)
+                            {
+                                if (!d.Name.Contains("IR", StringComparison.OrdinalIgnoreCase) && !d.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    device = d;
+                                    break;
+                                }
+                            }
+                            
                             Console.WriteLine($"Found camera: {device.Name}");
                             _videoSource = new VideoCaptureDevice(device.MonikerString);
 
-                            // Optional: Lower resolution to save bandwidth
+                            // KHÔNG tự động set resolution về thấp nhất nữa.
+                            // Việc OrderBy FrameSize.Width có thể lấy nhầm độ phân giải 0x0 hoặc không thực tế, khiến AForge không thể bắt đầu.
                             if (_videoSource.VideoCapabilities.Length > 0)
                             {
-                                _videoSource.VideoResolution = _videoSource.VideoCapabilities.OrderBy(v => v.FrameSize.Width).First();
-                                Console.WriteLine($"Camera resolution set to: {_videoSource.VideoResolution.FrameSize.Width}x{_videoSource.VideoResolution.FrameSize.Height}");
+                                // Chọn độ phân giải mặc định hoặc mức trung bình (ví dụ: 640x480) nếu muốn,
+                                // Hoặc an toàn nhất là để AForge tự dùng default resolution.
+                                // Chúng ta sẽ log ra chứ không ép buộc đổi phân giải xuống thấp nhất nữa.
+                                Console.WriteLine("Available resolutions: " + _videoSource.VideoCapabilities.Length);
                             }
 
                             _videoSource.NewFrame += new NewFrameEventHandler(video_NewFrame);
