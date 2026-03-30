@@ -136,9 +136,19 @@ namespace WebApp.Hubs
         }
 
         // --- NEW: Webcam Stream ---
-        public async Task RequestStartWebcam(string targetConnectionId)
+        public async Task RequestWebcams(string targetConnectionId)
         {
-            await Clients.Client(targetConnectionId).SendAsync("StartWebcamCommand");
+            await Clients.Client(targetConnectionId).SendAsync("GetWebcamsCommand");
+        }
+
+        public async Task SendWebcamsResult(string adminConnectionId, string webcamsJson)
+        {
+            await Clients.All.SendAsync("ReceiveWebcams", Context.ConnectionId, webcamsJson);
+        }
+
+        public async Task RequestStartWebcam(string targetConnectionId, string cameraMoniker = "")
+        {
+            await Clients.Client(targetConnectionId).SendAsync("StartWebcamCommand", cameraMoniker ?? "");
         }
 
         public async Task RequestStopWebcam(string targetConnectionId)

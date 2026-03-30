@@ -352,9 +352,29 @@ namespace AgentApp
             });
 
             // --- NEW: Webcam Stream ---
-            _connection.On("StartWebcamCommand", () =>
+            _connection.On("GetWebcamsCommand", async () =>
             {
-                Console.WriteLine("Command Received: StartWebcamCommand");
+                Console.WriteLine("Command Received: GetWebcamsCommand");
+                try
+                {
+                    FilterInfoCollection videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+                    var cameras = new System.Collections.Generic.List<object>();
+                    foreach (FilterInfo d in videoDevices)
+                    {
+                        cameras.Add(new { Name = d.Name, MonikerString = d.MonikerString });
+                    }
+                    var json = JsonSerializer.Serialize(cameras);
+                    await _connection.InvokeAsync("SendWebcamsResult", "", json);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error getting webcams: {ex.Message}");
+                }
+            });
+
+            _connection.On<string>("StartWebcamCommand", (cameraMoniker) =>
+            {
+                Console.WriteLine($"Command Received: StartWebcamCommand for moniker: {cameraMoniker}");
 
                 try
                 {
@@ -364,13 +384,28 @@ namespace AgentApp
                         if (_videoSource == null)
                         {
                             var device = videoDevices[0];
-                            // Ưu tiên chọn WebCam thường (RGB), bỏ qua IR Camera (thường gặp trên Asus Expertbook có Windows Hello)
-                            foreach (FilterInfo d in videoDevices)
+                            
+                            if (!string.IsNullOrEmpty(cameraMoniker))
                             {
-                                if (!d.Name.Contains("IR", StringComparison.OrdinalIgnoreCase) && !d.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
+                                foreach (FilterInfo d in videoDevices)
                                 {
-                                    device = d;
-                                    break;
+                                    if (d.MonikerString == cameraMoniker)
+                                    {
+                                        device = d;
+                                        break;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // Ưu tiên chọn WebCam thường (RGB), bỏ qua IR Camera (thường gặp trên Asus Expertbook có Windows Hello)
+                                foreach (FilterInfo d in videoDevices)
+                                {
+                                    if (!d.Name.Contains("IR", StringComparison.OrdinalIgnoreCase) && !d.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        device = d;
+                                        break;
+                                    }
                                 }
                             }
                             
