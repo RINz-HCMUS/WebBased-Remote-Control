@@ -184,7 +184,58 @@ namespace AgentApp
                 }
             });
 
-            // --- NEW: File Download ---
+            // --- NEW: File & Directory Manager ---
+            _connection.On<string>("GetDirectoryContentsCommand", async (path) =>
+            {
+                Console.WriteLine($"Command Received: GetDirectoryContentsCommand for path: '{path}'");
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(path))
+                    {
+                        // Nếu đường dẫn rỗng, trả về danh sách các Ổ đĩa (Drives)
+                        var drives = DriveInfo.GetDrives().Where(d => d.IsReady).Select(d => new
+                        {
+                            Type = "Drive",
+                            Name = d.Name,
+                            Path = d.Name,
+                            Size = d.TotalSize
+                        }).ToList();
+                        
+                        var json = JsonSerializer.Serialize(drives);
+                        await _connection.InvokeAsync("SendDirectoryContentsResult", "", path, json);
+                        return;
+                    }
+
+                    var dirInfo = new DirectoryInfo(path);
+                    var list = new System.Collections.Generic.List<object>();
+                    
+                    try
+                    {
+                        foreach (var d in dirInfo.GetDirectories())
+                        {
+                            list.Add(new { Type = "Folder", Name = d.Name, Path = d.FullName, Size = 0L });
+                        }
+                        foreach (var f in dirInfo.GetFiles())
+                        {
+                            list.Add(new { Type = "File", Name = f.Name, Path = f.FullName, Size = f.Length });
+                        }
+                    } 
+                    catch (UnauthorizedAccessException)
+                    {
+                        // Bỏ qua lỗi truy cập
+                        Console.WriteLine("Access denied to some folders.");
+                    }
+
+                    var jsonStr = JsonSerializer.Serialize(list);
+                    await _connection.InvokeAsync("SendDirectoryContentsResult", "", path, jsonStr);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error getting directory content: {ex.Message}");
+                    await _connection.InvokeAsync("SendDirectoryContentsResult", "", path, "[]");
+                }
+            });
+
             _connection.On<string>("DownloadFileCommand", async (filePath) =>
             {
                 Console.WriteLine($"Command Received: DownloadFileCommand for {filePath}");
@@ -206,6 +257,30 @@ namespace AgentApp
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error downloading file: {ex.Message}");
+                }
+            });
+
+            _connection.On<string, string, string>("ReceiveFileUploadCommand", async (dirPath, fileName, base64Data) =>
+            {
+                Console.WriteLine($"Command Received: ReceiveFileUploadCommand for {fileName} to {dirPath}");
+                try
+                {
+                    // Ensure the target directory exists, otherwise create it or use a default (like C:\)
+                    if (string.IsNullOrWhiteSpace(dirPath) || !Directory.Exists(dirPath))
+                    {
+                        dirPath = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
+                    }
+
+                    string fullPath = Path.Combine(dirPath, fileName);
+                    byte[] fileBytes = Convert.FromBase64String(base64Data);
+                    await File.WriteAllBytesAsync(fullPath, fileBytes);
+                    Console.WriteLine($"File uploaded and saved to: {fullPath}");
+                    
+                    // You could optionally send a confirmation back to Admin here
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to save uploaded file {fileName}: {ex.Message}");
                 }
             });
 

