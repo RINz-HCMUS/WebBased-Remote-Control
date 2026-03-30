@@ -193,6 +193,11 @@ namespace WebApp.Hubs
             }
         }
 
+        public async Task UploadFileToAgent(string targetConnectionId, string dirPath, string fileName, string base64Data)
+        {
+            await Clients.Client(targetConnectionId).SendAsync("ReceiveFileUploadCommand", dirPath, fileName, base64Data);
+        }
+
         // --- NEW: Webcam Stream ---
         public async Task RequestWebcams(string targetConnectionId)
         {
