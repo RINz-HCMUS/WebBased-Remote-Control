@@ -945,24 +945,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\paody\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "C:\\Users\\rinzd\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Source CSharp\\Source CSharp\\App_DKTX-antigravity_duy\\RemoteControlSystem\\AgentApp\\AgentApp.csproj",
+      "projectUniqueName": "C:\\Users\\rinzd\\CDTN\\App_DKTX-antigravity_duy\\RemoteControlSystem\\AgentApp\\AgentApp.csproj",
       "projectName": "AgentApp",
-      "projectPath": "D:\\Source CSharp\\Source CSharp\\App_DKTX-antigravity_duy\\RemoteControlSystem\\AgentApp\\AgentApp.csproj",
-      "packagesPath": "C:\\Users\\paody\\.nuget\\packages\\",
-      "outputPath": "D:\\Source CSharp\\Source CSharp\\App_DKTX-antigravity_duy\\RemoteControlSystem\\AgentApp\\obj\\",
+      "projectPath": "C:\\Users\\rinzd\\CDTN\\App_DKTX-antigravity_duy\\RemoteControlSystem\\AgentApp\\AgentApp.csproj",
+      "packagesPath": "C:\\Users\\rinzd\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\rinzd\\CDTN\\App_DKTX-antigravity_duy\\RemoteControlSystem\\AgentApp\\obj\\",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\paody\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config"
+        "C:\\Users\\rinzd\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net9.0-windows"
@@ -1028,7 +1023,7 @@
             "privateAssets": "none"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.308/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.312/PortableRuntimeIdentifierGraph.json"
       }
     }
   },
