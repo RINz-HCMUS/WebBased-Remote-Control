@@ -355,89 +355,103 @@ namespace AgentApp
             _connection.On("GetWebcamsCommand", async () =>
             {
                 Console.WriteLine("Command Received: GetWebcamsCommand");
+                string json = "[]";
                 try
                 {
-                    FilterInfoCollection videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
-                    var cameras = new System.Collections.Generic.List<object>();
-                    foreach (FilterInfo d in videoDevices)
+                    // Chạy ngầm trong 1 luồng STA (COM DirectShow yêu cầu) để tránh bị treo cứng (hang/deadlock)
+                    Thread t = new Thread(() =>
                     {
-                        cameras.Add(new { Name = d.Name, MonikerString = d.MonikerString });
-                    }
-                    var json = JsonSerializer.Serialize(cameras);
+                        try
+                        {
+                            FilterInfoCollection videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+                            var cameras = new System.Collections.Generic.List<object>();
+                            foreach (FilterInfo d in videoDevices)
+                            {
+                                cameras.Add(new { Name = d.Name, MonikerString = d.MonikerString });
+                            }
+                            json = JsonSerializer.Serialize(cameras);
+                        }
+                        catch { }
+                    });
+                    t.SetApartmentState(ApartmentState.STA);
+                    t.Start();
+                    t.Join(5000); // Đợi tối đa 5 giây tránh treo vĩnh viễn
+
                     await _connection.InvokeAsync("SendWebcamsResult", "", json);
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error getting webcams: {ex.Message}");
+                    await _connection.InvokeAsync("SendWebcamsResult", "", "[]");
                 }
             });
 
             _connection.On<string>("StartWebcamCommand", (cameraMoniker) =>
             {
                 Console.WriteLine($"Command Received: StartWebcamCommand for moniker: {cameraMoniker}");
-
                 try
                 {
-                    FilterInfoCollection videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
-                    if (videoDevices.Count > 0)
+                    Thread t = new Thread(() =>
                     {
-                        if (_videoSource == null)
+                        try
                         {
-                            var device = videoDevices[0];
-                            
-                            if (!string.IsNullOrEmpty(cameraMoniker))
+                            FilterInfoCollection videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+                            if (videoDevices.Count > 0)
                             {
-                                foreach (FilterInfo d in videoDevices)
+                                if (_videoSource == null)
                                 {
-                                    if (d.MonikerString == cameraMoniker)
+                                    var device = videoDevices[0];
+                                    
+                                    if (!string.IsNullOrEmpty(cameraMoniker))
                                     {
-                                        device = d;
-                                        break;
+                                        foreach (FilterInfo d in videoDevices)
+                                        {
+                                            if (d.MonikerString == cameraMoniker)
+                                            {
+                                                device = d;
+                                                break;
+                                            }
+                                        }
                                     }
+                                    else
+                                    {
+                                        foreach (FilterInfo d in videoDevices)
+                                        {
+                                            if (!d.Name.Contains("IR", StringComparison.OrdinalIgnoreCase) && !d.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                device = d;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    
+                                    Console.WriteLine($"Found camera: {device.Name}");
+                                    _videoSource = new VideoCaptureDevice(device.MonikerString);
+                                    if (_videoSource.VideoCapabilities.Length > 0)
+                                    {
+                                        Console.WriteLine("Available resolutions: " + _videoSource.VideoCapabilities.Length);
+                                    }
+                                    _videoSource.NewFrame += new NewFrameEventHandler(video_NewFrame);
+                                    _videoSource.VideoSourceError += new VideoSourceErrorEventHandler(video_VideoSourceError);
+                                }
+
+                                if (!_videoSource.IsRunning)
+                                {
+                                    Console.WriteLine("Starting camera...");
+                                    _firstFrameSent = false;
+                                    _videoSource.Start();
+                                    Console.WriteLine("Camera start signal sent. Waiting for frames...");
                                 }
                             }
-                            else
-                            {
-                                // Ưu tiên chọn WebCam thường (RGB), bỏ qua IR Camera (thường gặp trên Asus Expertbook có Windows Hello)
-                                foreach (FilterInfo d in videoDevices)
-                                {
-                                    if (!d.Name.Contains("IR", StringComparison.OrdinalIgnoreCase) && !d.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        device = d;
-                                        break;
-                                    }
-                                }
-                            }
-                            
-                            Console.WriteLine($"Found camera: {device.Name}");
-                            _videoSource = new VideoCaptureDevice(device.MonikerString);
-
-                            // KHÔNG tự động set resolution về thấp nhất nữa.
-                            // Việc OrderBy FrameSize.Width có thể lấy nhầm độ phân giải 0x0 hoặc không thực tế, khiến AForge không thể bắt đầu.
-                            if (_videoSource.VideoCapabilities.Length > 0)
-                            {
-                                // Chọn độ phân giải mặc định hoặc mức trung bình (ví dụ: 640x480) nếu muốn,
-                                // Hoặc an toàn nhất là để AForge tự dùng default resolution.
-                                // Chúng ta sẽ log ra chứ không ép buộc đổi phân giải xuống thấp nhất nữa.
-                                Console.WriteLine("Available resolutions: " + _videoSource.VideoCapabilities.Length);
-                            }
-
-                            _videoSource.NewFrame += new NewFrameEventHandler(video_NewFrame);
-                            _videoSource.VideoSourceError += new VideoSourceErrorEventHandler(video_VideoSourceError);
                         }
-
-                        if (!_videoSource.IsRunning)
+                        catch (Exception ex)
                         {
-                            Console.WriteLine("Starting camera...");
-                            _firstFrameSent = false;
-                            _videoSource.Start();
-                            Console.WriteLine("Camera start signal sent. Waiting for frames...");
+                            Console.WriteLine($"Camera init thread error: {ex.Message}");
                         }
-                    }
-                    else
-                    {
-                        Console.WriteLine("No webcam devices found on this PC.");
-                    }
+                    });
+                    t.SetApartmentState(ApartmentState.STA);
+                    t.Start();
+                    t.Join(7000); 
                 }
                 catch (Exception ex)
                 {
