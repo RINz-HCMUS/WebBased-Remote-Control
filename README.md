@@ -5,7 +5,7 @@
   <em>Computer Networks - Graduation Project (22MMT)</em><br>
   <em>Major: Computer Networks and Telecommunications (Information Security Specialization)</em><br>
   <em>Faculty of Information Technology | University of Science, VNU-HCM</em><br>
-  👤 **Authors:** Trần Lê Bảo Duy (22127089) & Võ Hữu Tuấn (22127439) | 👨‍🏫 **Instructor:** Mr. Đỗ Hoàng Cường
+  👤 <strong>Authors:</strong> Trần Lê Bảo Duy (22127089) & Võ Hữu Tuấn (22127439) | 👨‍🏫 <strong>Instructor:</strong> Mr. Đỗ Hoàng Cường
 </p>
 
 <p align="center">
@@ -13,19 +13,6 @@
   Manage, monitor, and execute commands on multiple remote computers simultaneously directly through a Web Browser without requiring a standalone admin client desktop app.
 </p>
 
-<p align="center">
-  <!-- GitHub Repo Status Badges -->
-  <a href="https://github.com/DANNOSIUCUTE/App_DKTX/commits/antigravity_duy">
-    <img src="https://img.shields.io/github/last-commit/DANNOSIUCUTE/App_DKTX?style=for-the-badge&color=blue" alt="Last Commit"/>
-  </a>
-  <a href="https://github.com/DANNOSIUCUTE/App_DKTX/stargazers">
-    <img src="https://img.shields.io/github/stars/DANNOSIUCUTE/App_DKTX?style=for-the-badge&color=gold" alt="Stars"/>
-  </a>
-  <a href="https://github.com/DANNOSIUCUTE/App_DKTX/network/members">
-    <img src="https://img.shields.io/github/forks/DANNOSIUCUTE/App_DKTX?style=for-the-badge&color=green" alt="Forks"/>
-  </a>
-  <img src="https://img.shields.io/github/repo-size/DANNOSIUCUTE/App_DKTX?style=for-the-badge" alt="Size"/>
-</p>
 
 <p align="center">
   <!-- Technology Badges -->
