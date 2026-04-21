@@ -12,7 +12,7 @@ if (localIp == null)
     localIp = "127.0.0.1";
 }
 
-// Bind trực tiếp tới địa chỉ IP LAN để cho phép kết nối từ máy khác
+// Bind directly to the LAN IP address to allow connections from other machines
 builder.WebHost.UseUrls($"http://{localIp}:5000");
 // Add services to the container.
 builder.Services.AddRazorPages();
@@ -54,7 +54,7 @@ static string GetLocalIPv4()
                     i.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
                     i.NetworkInterfaceType != NetworkInterfaceType.Tunnel);
 
-    // Ưu tiên WiFi adapter trước
+    // Prioritize Wi-Fi adapters
     var wifiInterfaces = interfaces.Where(i => i.Name.ToLower().Contains("wi-fi") || i.Name.ToLower().Contains("wireless"));
     var preferredInterfaces = wifiInterfaces.Any() ? wifiInterfaces : interfaces;
 
